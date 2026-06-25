@@ -1,5 +1,5 @@
-@* A single match card with the sharp-vs-public odds comparison table. *@
-<div class="match-card card-hover @EdgeBorderClass">
+@* A single match card with the sharp-vs-public odds comparison grid (MudTable). *@
+<MudPaper Class="@($"match-card card-hover {EdgeBorderClass}")" Elevation="0">
     <div class="match-card-head">
         <div class="match-teams">
             <span class="match-flag">@Bet.HomeFlag</span>
@@ -10,7 +10,7 @@
         </div>
         <div class="match-meta">
             <span class="match-time">@Bet.CommenceTime.ToLocalTime().ToString("ddd, MMM d • h:mm tt")</span>
-            <span class="edge-badge @EdgeBadgeClass">@EdgeBadgeText</span>
+            <MudChip T="string" Class="@($"edge-badge {EdgeBadgeClass}")" Size="Size.Small" Label="true">@EdgeBadgeText</MudChip>
         </div>
     </div>
 
@@ -20,28 +20,27 @@
     }
     else
     {
-        <div class="table-scroll">
-            <table class="odds-table">
-                <thead>
-                    <tr>
-                        <th class="bet-sel">Bet</th>
-                        <th class="pinnacle-head">Pinnacle <span class="sharp-tag">Sharp</span></th>
-                        <th>DraftKings</th>
-                        <th>FanDuel</th>
-                        <th>BetMGM</th>
-                        <th class="ev-head">EV%</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (var row in VisibleRows)
-                    {
-                        <BetRow Row="row" />
-                    }
-                </tbody>
-            </table>
-        </div>
+        <MudTable Items="VisibleRows" Dense="true" Hover="true" Elevation="0"
+                  Class="odds-mudtable" Breakpoint="Breakpoint.None">
+            <HeaderContent>
+                <MudTh Class="bet-sel">Bet</MudTh>
+                <MudTh Class="pinnacle-head">Pinnacle <span class="sharp-tag">Sharp</span></MudTh>
+                <MudTh>DraftKings</MudTh>
+                <MudTh>FanDuel</MudTh>
+                <MudTh>BetMGM</MudTh>
+                <MudTh Class="ev-head">EV%</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Bet" Class="bet-sel">@context.Selection</MudTd>
+                <MudTd DataLabel="Pinnacle" Class="pinnacle-cell">@Fmt(context.PinnacleAmerican)</MudTd>
+                <MudTd DataLabel="DraftKings" Class="@($"book-cell {EvClass(context.DraftKingsEv)}")">@Fmt(context.DraftKingsAmerican)</MudTd>
+                <MudTd DataLabel="FanDuel" Class="@($"book-cell {EvClass(context.FanDuelEv)}")">@Fmt(context.FanDuelAmerican)</MudTd>
+                <MudTd DataLabel="BetMGM" Class="@($"book-cell {EvClass(context.BetMgmEv)}")">@Fmt(context.BetMgmAmerican)</MudTd>
+                <MudTd DataLabel="EV%" Class="@($"ev-cell {EvClass(BestOf(context))}")">@FmtEv(BestOf(context))</MudTd>
+            </RowTemplate>
+        </MudTable>
     }
-</div>
+</MudPaper>
 
 @code {
     [Parameter, EditorRequired] public EVBet Bet { get; set; } = default!;
@@ -56,6 +55,27 @@
         "strong" => r.HasStrongValue,
         _ => true
     }).ToList();
+
+    private static double? BestOf(OddsComparison row) =>
+        row.BestEv == double.NegativeInfinity ? null : row.BestEv;
+
+    private static string Fmt(double? american)
+    {
+        if (!american.HasValue) return "—";
+        var v = Math.Round(american.Value);
+        return v > 0 ? $"+{v:0}" : $"{v:0}";
+    }
+
+    private static string FmtEv(double? ev) =>
+        ev.HasValue ? $"{ev.Value * 100:+0.0;-0.0;0.0}%" : "—";
+
+    private static string EvClass(double? ev)
+    {
+        if (!ev.HasValue) return "";
+        if (ev.Value > OddsThresholds.StrongValue) return "ev-strong";
+        if (ev.Value > OddsThresholds.Value) return "ev-value";
+        return "";
+    }
 
     private string EdgeBadgeText => Bet.EdgeScore switch
     {

@@ -145,17 +145,13 @@ a { color: inherit; text-decoration: none; }
     position: fixed; inset: 0; z-index: 1000;
     display: flex; flex-direction: column; align-items: center; justify-content: center;
     overflow: hidden;
-    background: linear-gradient(135deg, #1a1a2e, #0f3460, #16213e, #1a1a2e);
-    background-size: 400% 400%;
-    animation: gradientShift 14s ease infinite;
+    /* World Cup wallpaper, darkened with a themed gradient so text stays legible */
+    background:
+        linear-gradient(180deg, rgba(26, 26, 46, 0.62) 0%, rgba(15, 52, 96, 0.45) 45%, rgba(26, 26, 46, 0.9) 100%),
+        url('/images/splash-bg.jpg') center center / cover no-repeat;
     transition: opacity 0.45s ease, transform 0.45s ease;
 }
 .splash-leaving { opacity: 0; transform: scale(1.04); }
-@keyframes gradientShift {
-    0% { background-position: 0% 50%; }
-    50% { background-position: 100% 50%; }
-    100% { background-position: 0% 50%; }
-}
 
 .splash-particles { position: absolute; inset: 0; pointer-events: none; }
 .particle {
@@ -673,6 +669,84 @@ a { color: inherit; text-decoration: none; }
     line-height: 1.5;
 }
 .bell-caption strong { color: var(--accent-2); }
+
+/* ============================================================
+   MudBlazor integration — charts, tables, panels
+   ============================================================ */
+.chart-panel {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.2rem;
+    margin-top: 1rem;
+}
+.chart-title { font-weight: 700; margin-bottom: 0.4rem; }
+.chart-sub { color: var(--text-faint); font-weight: 500; font-size: 0.85rem; }
+
+.donut-panel {
+    display: flex; align-items: center; gap: 2rem;
+    flex-wrap: wrap; justify-content: center;
+}
+.donut-legend { display: flex; flex-direction: column; gap: 0.45rem; min-width: 230px; }
+.donut-legend-item { display: flex; align-items: center; gap: 0.6rem; font-size: 0.9rem; }
+.donut-swatch { width: 13px; height: 13px; border-radius: 3px; flex-shrink: 0; }
+.donut-legend-name { flex: 1; }
+.donut-legend-val { font-weight: 700; color: var(--accent-2); font-variant-numeric: tabular-nums; }
+
+/* MudChart text/lines on the dark theme */
+.chart-panel .mud-chart-line { stroke-width: 2.5px; }
+.chart-panel svg text { fill: var(--text-dim); }
+
+/* MudTable themed to match the app */
+.odds-mudtable, .prob-mudtable,
+.odds-mudtable .mud-table-root, .prob-mudtable .mud-table-root,
+.odds-mudtable .mud-table-container, .prob-mudtable .mud-table-container { background: transparent; }
+.odds-mudtable .mud-table-cell, .prob-mudtable .mud-table-cell {
+    border-color: var(--border);
+    color: var(--text);
+}
+.odds-mudtable .mud-table-head .mud-table-cell,
+.prob-mudtable .mud-table-head .mud-table-cell {
+    color: var(--text-faint);
+    text-transform: uppercase;
+    font-size: 0.74rem;
+    letter-spacing: 0.03em;
+    font-weight: 700;
+}
+.prob-mudtable .mud-table-sort-label,
+.prob-mudtable .mud-table-sort-label:hover { color: inherit; }
+.prob-mudtable .mud-table-sort-label.mud-table-sort-label-selected,
+.prob-mudtable .mud-table-sort-label .mud-table-sort-label-icon { color: var(--accent-2); }
+.prob-mudtable .team-col { font-weight: 700; white-space: nowrap; }
+.prob-mudtable .num-col { text-align: center; font-variant-numeric: tabular-nums; }
+.prob-mudtable .win-col { font-weight: 800; }
+.prob-mudtable tbody tr.row-selected { outline: 2px solid var(--accent-2); outline-offset: -2px; }
+.prob-mudtable tbody tr.row-selected .team-col { color: var(--accent-2); }
+
+/* Edge Finder odds grid: keep the gold Pinnacle column + EV highlights */
+.odds-mudtable .bet-sel { text-align: left; font-weight: 700; }
+.odds-mudtable .book-cell, .odds-mudtable .ev-cell { text-align: center; font-variant-numeric: tabular-nums; }
+.odds-mudtable .ev-cell, .odds-mudtable .ev-head { font-weight: 800; }
+.odds-mudtable td.pinnacle-cell, .odds-mudtable th.pinnacle-head {
+    border-left: 2px solid var(--gold-border);
+    border-right: 2px solid var(--gold-border);
+    color: var(--accent-2);
+    font-weight: 700;
+}
+.odds-mudtable td.ev-value {
+    background: var(--good-soft) !important;
+    border-left: 3px solid var(--good);
+    color: var(--good);
+}
+.odds-mudtable td.ev-strong {
+    background: rgba(0, 255, 100, 0.28) !important;
+    border-left: 3px solid var(--good);
+    color: #aaffcc;
+    font-weight: 800;
+}
+
+/* MatchCard is now a MudPaper — keep its custom look */
+.match-card.mud-paper { background: var(--card); padding: 1.3rem; }
 
 /* ============================================================
    Responsive

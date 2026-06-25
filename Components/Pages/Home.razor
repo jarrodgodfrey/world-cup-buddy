@@ -1,5 +1,5 @@
 @page "/"
-@rendermode InteractiveServer
+@layout SplashLayout
 @inject NavigationManager Nav
 @inject IJSRuntime JS
 @implements IAsyncDisposable
@@ -74,7 +74,7 @@
         if (firstRender)
         {
             _ref = DotNetObjectReference.Create(this);
-            await JS.InvokeVoidAsync("wcbSplash.start", _ref, 5000);
+            await JS.InvokeVoidAsync("wcbSplash.start", _ref, 25000);
         }
     }
 

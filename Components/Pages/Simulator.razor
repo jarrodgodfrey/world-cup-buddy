@@ -1,5 +1,4 @@
 @page "/simulator"
-@rendermode InteractiveServer
 @inject SimulationService Sim
 @using System.Globalization
 
@@ -93,43 +92,58 @@
         <section class="sim-section">
             <h2 class="section-title">Your Team's Path</h2>
             <TeamPathCard Path="_result.SelectedPath" />
+            <MudPaper Class="chart-panel" Elevation="0">
+                <div class="chart-title">Round-by-round reach probability <span class="chart-sub">(%)</span></div>
+                <MudChart ChartType="ChartType.Bar" ChartSeries="_pathSeries" XAxisLabels="_pathLabels"
+                          ChartOptions="_chartOptions" Width="100%" Height="300px" />
+            </MudPaper>
         </section>
     }
 
     <section class="sim-section">
+        <h2 class="section-title">Title Contenders <span class="section-tag">win probability</span></h2>
+        <MudPaper Class="chart-panel donut-panel" Elevation="0">
+            <MudChart ChartType="ChartType.Donut" InputData="_contenderData" InputLabels="_contenderLabels"
+                      ChartOptions="_chartOptions" Width="320px" Height="320px" />
+            <div class="donut-legend">
+                @for (var i = 0; i < _contenderLabels.Length; i++)
+                {
+                    <div class="donut-legend-item">
+                        <span class="donut-swatch" style="background:@WcbTheme.ChartPalette[i % WcbTheme.ChartPalette.Length]"></span>
+                        <span class="donut-legend-name">@_contenderLabels[i]</span>
+                        <span class="donut-legend-val">@_contenderData[i].ToString("0.0")%</span>
+                    </div>
+                }
+            </div>
+        </MudPaper>
+    </section>
+
+    <section class="sim-section">
         <h2 class="section-title">Full Bracket Probability</h2>
-        <div class="table-scroll">
-            <table class="prob-table">
-                <thead>
-                    <tr>
-                        @foreach (var col in Columns)
-                        {
-                            <th class="@(col.key == "team" ? "team-col" : "num-col") sortable @(SortIcon(col.key) != "" ? "sorted" : "")"
-                                @onclick="() => SortBy(col.key)">
-                                @col.label <span class="sort-icon">@SortIcon(col.key)</span>
-                            </th>
-                        }
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (var t in SortedTeams)
-                    {
-                        <tr class="@(t.Team == _selected ? "row-selected" : "")">
-                            <td class="team-col">
-                                <span class="prob-flag">@t.Flag</span> @t.Team
-                                <span class="prob-group">@t.Group</span>
-                            </td>
-                            <td class="num-col" style="@RedCell(t.GroupExitPct)">@Pct(t.GroupExitPct)</td>
-                            <td class="num-col" style="@GreenCell(t.R16Pct)">@Pct(t.R16Pct)</td>
-                            <td class="num-col" style="@GreenCell(t.QfPct)">@Pct(t.QfPct)</td>
-                            <td class="num-col" style="@GreenCell(t.SfPct)">@Pct(t.SfPct)</td>
-                            <td class="num-col" style="@GreenCell(t.FinalPct)">@Pct(t.FinalPct)</td>
-                            <td class="num-col win-col" style="@GreenCell(t.WinPct)">@Pct(t.WinPct)</td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
-        </div>
+        <MudTable Items="_result.Teams" Hover="true" Dense="true" Elevation="0"
+                  Class="prob-mudtable" RowClassFunc="RowClass" Breakpoint="Breakpoint.None">
+            <HeaderContent>
+                <MudTh><MudTableSortLabel SortBy="@(new Func<TeamSimResult, object>(x => x.Team))">Team</MudTableSortLabel></MudTh>
+                <MudTh><MudTableSortLabel SortBy="@(new Func<TeamSimResult, object>(x => x.GroupExitPct))">Group Exit %</MudTableSortLabel></MudTh>
+                <MudTh><MudTableSortLabel SortBy="@(new Func<TeamSimResult, object>(x => x.R16Pct))">R16 %</MudTableSortLabel></MudTh>
+                <MudTh><MudTableSortLabel SortBy="@(new Func<TeamSimResult, object>(x => x.QfPct))">QF %</MudTableSortLabel></MudTh>
+                <MudTh><MudTableSortLabel SortBy="@(new Func<TeamSimResult, object>(x => x.SfPct))">SF %</MudTableSortLabel></MudTh>
+                <MudTh><MudTableSortLabel SortBy="@(new Func<TeamSimResult, object>(x => x.FinalPct))">Final %</MudTableSortLabel></MudTh>
+                <MudTh><MudTableSortLabel InitialDirection="SortDirection.Descending" SortBy="@(new Func<TeamSimResult, object>(x => x.WinPct))">Win %</MudTableSortLabel></MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Team" Class="team-col">
+                    <span class="prob-flag">@context.Flag</span> @context.Team
+                    <span class="prob-group">@context.Group</span>
+                </MudTd>
+                <MudTd DataLabel="Group Exit %" Class="num-col" Style="@RedCell(context.GroupExitPct)">@Pct(context.GroupExitPct)</MudTd>
+                <MudTd DataLabel="R16 %" Class="num-col" Style="@GreenCell(context.R16Pct)">@Pct(context.R16Pct)</MudTd>
+                <MudTd DataLabel="QF %" Class="num-col" Style="@GreenCell(context.QfPct)">@Pct(context.QfPct)</MudTd>
+                <MudTd DataLabel="SF %" Class="num-col" Style="@GreenCell(context.SfPct)">@Pct(context.SfPct)</MudTd>
+                <MudTd DataLabel="Final %" Class="num-col" Style="@GreenCell(context.FinalPct)">@Pct(context.FinalPct)</MudTd>
+                <MudTd DataLabel="Win %" Class="num-col win-col" Style="@GreenCell(context.WinPct)">@Pct(context.WinPct)</MudTd>
+            </RowTemplate>
+        </MudTable>
     </section>
 
     <section class="sim-section">
@@ -145,21 +159,20 @@
     private bool _showHelp;
     private double _progress;
 
-    private string _sortCol = "win";
-    private bool _sortDesc = true;
-
-    private static readonly (string key, string label)[] Columns =
+    // Charts.
+    private List<ChartSeries> _pathSeries = new();
+    private string[] _pathLabels = Array.Empty<string>();
+    private double[] _contenderData = Array.Empty<double>();
+    private string[] _contenderLabels = Array.Empty<string>();
+    private readonly ChartOptions _chartOptions = new()
     {
-        ("team", "Team"),
-        ("exit", "Group Exit %"),
-        ("r16", "R16 %"),
-        ("qf", "QF %"),
-        ("sf", "SF %"),
-        ("final", "Final %"),
-        ("win", "Win %"),
+        ChartPalette = WcbTheme.ChartPalette,
+        YAxisTicks = 2,
     };
 
     private void Select(string team) => _selected = team;
+
+    private string RowClass(TeamSimResult t, int _) => t.Team == _selected ? "row-selected" : "";
 
     private async Task RunSimulation()
     {
@@ -177,6 +190,7 @@
         }
 
         _result = await work;
+        BuildCharts();
         _progress = 100;
         StateHasChanged();
         await Task.Delay(250);
@@ -184,48 +198,25 @@
         _running = false;
     }
 
-    private void SortBy(string col)
+    private void BuildCharts()
     {
-        if (_sortCol == col) { _sortDesc = !_sortDesc; }
-        else { _sortCol = col; _sortDesc = col != "team" && col != "exit"; }
-    }
+        if (_result is null) return;
 
-    private string SortIcon(string col) =>
-        _sortCol != col ? "" : _sortDesc ? "▼" : "▲";
-
-    private IEnumerable<TeamSimResult> SortedTeams
-    {
-        get
+        if (_result.SelectedPath is not null)
         {
-            if (_result is null) return Enumerable.Empty<TeamSimResult>();
-
-            Func<TeamSimResult, IComparable> key = _sortCol switch
+            var nodes = _result.SelectedPath.Nodes;
+            _pathLabels = nodes.Select(n => n.Round).ToArray();
+            _pathSeries = new List<ChartSeries>
             {
-                "team" => t => t.Team,
-                "exit" => t => t.GroupExitPct,
-                "r16" => t => t.R16Pct,
-                "qf" => t => t.QfPct,
-                "sf" => t => t.SfPct,
-                "final" => t => t.FinalPct,
-                _ => t => t.WinPct,
+                new() { Name = "Reach %", Data = nodes.Select(n => Math.Round(n.ReachProb, 1)).ToArray() }
             };
-
-            var ordered = (_sortDesc
-                ? _result.Teams.OrderByDescending(key)
-                : _result.Teams.OrderBy(key)).ToList();
-
-            // Pin the selected team to the top.
-            if (_selected is not null)
-            {
-                var sel = ordered.FirstOrDefault(t => t.Team == _selected);
-                if (sel is not null)
-                {
-                    ordered.Remove(sel);
-                    ordered.Insert(0, sel);
-                }
-            }
-            return ordered;
         }
+
+        // Top contenders by win probability, with a "Field" slice for everyone else.
+        var top = _result.Teams.OrderByDescending(t => t.WinPct).Take(8).ToList();
+        var field = Math.Max(0, Math.Round(100 - top.Sum(t => t.WinPct), 1));
+        _contenderData = top.Select(t => Math.Round(t.WinPct, 1)).Append(field).ToArray();
+        _contenderLabels = top.Select(t => t.Team).Append("Field").ToArray();
     }
 
     private static string Pct(double v) => v.ToString("0.0", CultureInfo.InvariantCulture) + "%";

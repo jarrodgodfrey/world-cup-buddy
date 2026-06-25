@@ -10,4 +10,8 @@
     <RollForward>LatestMajor</RollForward>
   </PropertyGroup>
 
+  <ItemGroup>
+    <PackageReference Include="MudBlazor" Version="8.15.0" />
+  </ItemGroup>
+
 </Project>

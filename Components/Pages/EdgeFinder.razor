@@ -1,5 +1,4 @@
 @page "/edge-finder"
-@rendermode InteractiveServer
 @inject OddsService Odds
 
 <PageTitle>Edge Finder · World Cup Buddy</PageTitle>
@@ -74,6 +73,18 @@
     </div>
 </div>
 
+@if (!_loading && _evSeries.Count > 0 && _evSeries[0].Data.Length > 0)
+{
+    <MudPaper Class="chart-panel" Elevation="0">
+        <div class="chart-title">Best EV by Match <span class="chart-sub">top value opportunities (%)</span></div>
+        <MudChart ChartType="ChartType.Bar"
+                  ChartSeries="_evSeries"
+                  XAxisLabels="_evLabels"
+                  ChartOptions="_chartOptions"
+                  Width="100%" Height="300px" />
+    </MudPaper>
+}
+
 <div class="filter-tabs">
     @foreach (var (key, label) in Tabs)
     {
@@ -126,6 +137,15 @@ else
     private string _filter = "all";
     private DateTime _lastUpdated;
 
+    // EV bar chart.
+    private List<ChartSeries> _evSeries = new();
+    private string[] _evLabels = Array.Empty<string>();
+    private readonly ChartOptions _chartOptions = new()
+    {
+        ChartPalette = WcbTheme.ChartPalette,
+        YAxisTicks = 2,
+    };
+
     private static readonly (string key, string label)[] Tabs =
     {
         ("all", "All Bets"),
@@ -145,9 +165,27 @@ else
 
         _edges = await Odds.GetEdgesAsync();
         _lastUpdated = DateTime.Now;
+        BuildChart();
 
         _loading = false;
     }
+
+    private void BuildChart()
+    {
+        var top = _edges.Where(e => e.BestEv > 0)
+            .OrderByDescending(e => e.BestEv)
+            .Take(8)
+            .ToList();
+
+        _evLabels = top.Select(e => $"{Abbr(e.HomeTeam)}–{Abbr(e.AwayTeam)}").ToArray();
+        _evSeries = new List<ChartSeries>
+        {
+            new() { Name = "Best EV %", Data = top.Select(e => Math.Round(e.BestEv * 100, 1)).ToArray() }
+        };
+    }
+
+    private static string Abbr(string team) =>
+        team.Length >= 3 ? team[..3].ToUpperInvariant() : team.ToUpperInvariant();
 
     private List<EVBet> VisibleEdges => _filter == "strong"
         ? _edges.Where(e => e.StrongValueBetCount > 0).ToList()

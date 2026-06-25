@@ -21,7 +21,27 @@
       "Bash(curl -s \"https://api.the-odds-api.com/v4/sports/?apiKey=48fd24d0216de4f488415d60aeae9b14&all=true\")",
       "Bash(python3 -c ' *)",
       "Bash(curl -s -D - -o /tmp/wc.json \"https://api.the-odds-api.com/v4/sports/soccer_fifa_world_cup/odds?apiKey=48fd24d0216de4f488415d60aeae9b14&regions=us&markets=h2h,totals&oddsFormat=american&bookmakers=pinnacle,draftkings,fanduel,betmgm\")",
-      "Bash(python3 *)"
+      "Bash(python3 *)",
+      "Bash(grep -vE \"warn|Determining|Restored|^\\\\s*$\")",
+      "Bash(curl -s \"https://api.nuget.org/v3-flatcontainer/mudblazor/index.json\")",
+      "Bash(pkill -f \"WorldCupBuddy\")",
+      "Bash(lsof -ti:5080)",
+      "Bash(xargs kill -9)",
+      "Bash(ASPNETCORE_ENVIRONMENT=Development dotnet run -c Release)",
+      "Bash(curl -s -o /dev/null http://localhost:5080/edge-finder)",
+      "Bash(break)",
+      "Bash(pkill -f \"dotnet run\")",
+      "Bash(lsof -i:5080)",
+      "Bash(node /tmp/wcbtest/shot.js)",
+      "Bash(lsof -i:5080 -nP)",
+      "Bash(awk '{print $2, $11, $12, $13}')",
+      "Bash(kill -9 72184 72180)",
+      "Bash(az account *)",
+      "Bash(az group *)",
+      "Bash(az appservice *)",
+      "Bash(az webapp *)",
+      "Bash(zip -r -q ../app.zip .)",
+      "Bash(az resource *)"
     ]
   }
 }

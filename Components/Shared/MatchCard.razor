@@ -1,0 +1,80 @@
+@* A single match card with the sharp-vs-public odds comparison table. *@
+<div class="match-card card-hover @EdgeBorderClass">
+    <div class="match-card-head">
+        <div class="match-teams">
+            <span class="match-flag">@Bet.HomeFlag</span>
+            <span class="match-team">@Bet.HomeTeam</span>
+            <span class="match-vs">vs</span>
+            <span class="match-team">@Bet.AwayTeam</span>
+            <span class="match-flag">@Bet.AwayFlag</span>
+        </div>
+        <div class="match-meta">
+            <span class="match-time">@Bet.CommenceTime.ToLocalTime().ToString("ddd, MMM d • h:mm tt")</span>
+            <span class="edge-badge @EdgeBadgeClass">@EdgeBadgeText</span>
+        </div>
+    </div>
+
+    @if (VisibleRows.Count == 0)
+    {
+        <div class="match-norows">No bets match this filter.</div>
+    }
+    else
+    {
+        <div class="table-scroll">
+            <table class="odds-table">
+                <thead>
+                    <tr>
+                        <th class="bet-sel">Bet</th>
+                        <th class="pinnacle-head">Pinnacle <span class="sharp-tag">Sharp</span></th>
+                        <th>DraftKings</th>
+                        <th>FanDuel</th>
+                        <th>BetMGM</th>
+                        <th class="ev-head">EV%</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var row in VisibleRows)
+                    {
+                        <BetRow Row="row" />
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public EVBet Bet { get; set; } = default!;
+
+    /// <summary>"all", "h2h", "totals", or "strong".</summary>
+    [Parameter] public string Filter { get; set; } = "all";
+
+    private List<OddsComparison> VisibleRows => Bet.Rows.Where(r => Filter switch
+    {
+        "h2h" => r.Market == "h2h",
+        "totals" => r.Market == "totals",
+        "strong" => r.HasStrongValue,
+        _ => true
+    }).ToList();
+
+    private string EdgeBadgeText => Bet.EdgeScore switch
+    {
+        EdgeScore.StrongValue => $"🔥 Strong Value · {Bet.BestEv * 100:0.0}%",
+        EdgeScore.Value => $"✓ Value · {Bet.BestEv * 100:0.0}%",
+        _ => "No Edge"
+    };
+
+    private string EdgeBadgeClass => Bet.EdgeScore switch
+    {
+        EdgeScore.StrongValue => "edge-gold",
+        EdgeScore.Value => "edge-green",
+        _ => "edge-gray"
+    };
+
+    private string EdgeBorderClass => Bet.EdgeScore switch
+    {
+        EdgeScore.StrongValue => "border-gold",
+        EdgeScore.Value => "border-green",
+        _ => ""
+    };
+}

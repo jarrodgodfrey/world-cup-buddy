@@ -1,0 +1,11 @@
+<div class="spinner-wrap">
+    <div class="spinner-ball">⚽</div>
+    @if (!string.IsNullOrEmpty(Label))
+    {
+        <div class="spinner-label">@Label</div>
+    }
+</div>
+
+@code {
+    [Parameter] public string? Label { get; set; }
+}

@@ -1,0 +1,113 @@
+@page "/"
+@rendermode InteractiveServer
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+@implements IAsyncDisposable
+
+<PageTitle>World Cup Buddy</PageTitle>
+
+<div class="splash @(_leaving ? "splash-leaving" : "")">
+    <!-- Drifting soccer-ball particles -->
+    <div class="splash-particles" aria-hidden="true">
+        @for (var i = 0; i < 14; i++)
+        {
+            var left = (i * 7 + 3) % 100;
+            var delay = (i * 0.6).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture);
+            var dur = (9 + (i % 5)).ToString();
+            var size = (1.2 + (i % 4) * 0.5).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture);
+            <span class="particle"
+                  style="left:@(left)%; animation-delay:@(delay)s; animation-duration:@(dur)s; font-size:@(size)rem;">⚽</span>
+        }
+    </div>
+
+    <div class="splash-inner">
+        <div class="splash-ball" aria-hidden="true">
+            <svg viewBox="0 0 100 100" width="140" height="140">
+                <circle cx="50" cy="50" r="48" fill="#ffffff" stroke="#0f3460" stroke-width="2" />
+                <polygon points="50,30 62,39 57,53 43,53 38,39" fill="#1a1a2e" />
+                <polygon points="50,30 38,39 28,30 36,18 50,18" fill="#1a1a2e" opacity="0.85" />
+                <polygon points="50,30 62,39 72,30 64,18 50,18" fill="#1a1a2e" opacity="0.85" />
+                <polygon points="38,39 43,53 32,62 22,52 28,30" fill="#1a1a2e" opacity="0.7" />
+                <polygon points="62,39 72,30 78,52 68,62 57,53" fill="#1a1a2e" opacity="0.7" />
+                <polygon points="43,53 57,53 62,68 50,77 38,68" fill="#1a1a2e" opacity="0.6" />
+            </svg>
+        </div>
+
+        <h1 class="splash-title">World Cup Buddy</h1>
+        <p class="splash-tagline">Smart Betting. Sharp Odds. Your Tournament.</p>
+
+        <div class="splash-cards">
+            <div class="splash-card">
+                <div class="splash-card-icon">📊</div>
+                <div class="splash-card-title">Edge Finder</div>
+                <div class="splash-card-text">Find +EV bets vs DraftKings, FanDuel &amp; BetMGM using sharp Pinnacle lines</div>
+            </div>
+            <div class="splash-card">
+                <div class="splash-card-icon">🏆</div>
+                <div class="splash-card-title">Tournament Simulator</div>
+                <div class="splash-card-text">Monte Carlo bracket simulation across all 32 teams</div>
+            </div>
+            <div class="splash-card splash-card-soon">
+                <div class="splash-card-soon-badge">Coming Soon</div>
+                <div class="splash-card-icon">🍺</div>
+                <div class="splash-card-title">Watch Party Finder</div>
+                <div class="splash-card-text">Find the best bars and venues near you</div>
+            </div>
+        </div>
+
+        <button class="btn btn-primary splash-enter" @onclick="EnterApp">Enter App →</button>
+    </div>
+
+    <div class="splash-progress">
+        <div class="splash-progress-fill" style="width:@($"{_progress:0.##}")%"></div>
+    </div>
+</div>
+
+@code {
+    private double _progress;
+    private bool _leaving;
+    private bool _exited;
+    private DotNetObjectReference<Home>? _ref;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _ref = DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("wcbSplash.start", _ref, 5000);
+        }
+    }
+
+    [JSInvokable]
+    public Task OnTick(double pct)
+    {
+        _progress = pct;
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    [JSInvokable]
+    public Task OnComplete() => BeginExitAsync();
+
+    private async Task EnterApp()
+    {
+        await JS.InvokeVoidAsync("wcbSplash.cancel");
+        await BeginExitAsync();
+    }
+
+    private async Task BeginExitAsync()
+    {
+        if (_exited) return;
+        _exited = true;
+        _leaving = true;
+        StateHasChanged();
+        await Task.Delay(450); // let the fade-out play
+        Nav.NavigateTo("edge-finder");
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try { await JS.InvokeVoidAsync("wcbSplash.cancel"); } catch { /* circuit may be gone */ }
+        _ref?.Dispose();
+    }
+}

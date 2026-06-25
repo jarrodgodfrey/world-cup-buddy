@@ -1,0 +1,88 @@
+@* A pure CSS/HTML "chalk" bracket: each group's two highest-rated teams seeded
+   into the knockout draw, advancing by rating. A quick visual reference for the
+   projected path — the probability table tells the statistical story. *@
+<div class="bracket">
+    <div class="bracket-round">
+        <div class="bracket-round-title">Round of 16</div>
+        @foreach (var t in _r16) { @TeamChip(t) }
+    </div>
+    <div class="bracket-round">
+        <div class="bracket-round-title">Quarter-finals</div>
+        @foreach (var t in _qf) { @TeamChip(t) }
+    </div>
+    <div class="bracket-round">
+        <div class="bracket-round-title">Semi-finals</div>
+        @foreach (var t in _sf) { @TeamChip(t) }
+    </div>
+    <div class="bracket-round">
+        <div class="bracket-round-title">Final</div>
+        @foreach (var t in _final) { @TeamChip(t) }
+    </div>
+    <div class="bracket-round">
+        <div class="bracket-round-title">Champion</div>
+        @TeamChip(_champion, champion: true)
+    </div>
+</div>
+
+@code {
+    /// <summary>Optional team to highlight across the bracket.</summary>
+    [Parameter] public string? Highlight { get; set; }
+
+    private List<TeamInfo> _r16 = new();
+    private List<TeamInfo> _qf = new();
+    private List<TeamInfo> _sf = new();
+    private List<TeamInfo> _final = new();
+    private TeamInfo _champion = default!;
+
+    protected override void OnInitialized()
+    {
+        // Top 2 per group by rating → winner, runner-up.
+        var winners = new TeamInfo[8];
+        var runners = new TeamInfo[8];
+        for (var g = 0; g < WorldCupData.GroupNames.Length; g++)
+        {
+            var grp = WorldCupData.Teams
+                .Where(t => t.Group == WorldCupData.GroupNames[g])
+                .OrderByDescending(t => t.Rating)
+                .ToArray();
+            winners[g] = grp[0];
+            runners[g] = grp[1];
+        }
+
+        // Standard cross-group seeding.
+        _r16 = new()
+        {
+            winners[0], runners[1], winners[2], runners[3],
+            winners[4], runners[5], winners[6], runners[7],
+            winners[1], runners[0], winners[3], runners[2],
+            winners[5], runners[4], winners[7], runners[6],
+        };
+
+        _qf = Advance(_r16);
+        _sf = Advance(_qf);
+        _final = Advance(_sf);
+        _champion = Advance(_final)[0];
+    }
+
+    private static List<TeamInfo> Advance(List<TeamInfo> round)
+    {
+        var next = new List<TeamInfo>(round.Count / 2);
+        for (var i = 0; i < round.Count; i += 2)
+            next.Add(round[i].Rating >= round[i + 1].Rating ? round[i] : round[i + 1]);
+        return next;
+    }
+
+    private RenderFragment TeamChip(TeamInfo t, bool champion = false) => builder =>
+    {
+        var cls = "bracket-chip";
+        if (champion) cls += " bracket-champion";
+        if (!string.IsNullOrEmpty(Highlight) &&
+            t.Name.Equals(Highlight, StringComparison.OrdinalIgnoreCase))
+            cls += " bracket-highlight";
+
+        builder.OpenElement(0, "div");
+        builder.AddAttribute(1, "class", cls);
+        builder.AddContent(2, $"{t.Flag} {t.Name}");
+        builder.CloseElement();
+    };
+}

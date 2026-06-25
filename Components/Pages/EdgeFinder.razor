@@ -1,0 +1,159 @@
+@page "/edge-finder"
+@rendermode InteractiveServer
+@inject OddsService Odds
+
+<PageTitle>Edge Finder · World Cup Buddy</PageTitle>
+
+<div class="page-head">
+    <div>
+        <h1 class="page-title">Edge Finder</h1>
+        <p class="page-sub">Sharp money vs. public books</p>
+        <button class="btn-ghost" @onclick="() => _showHelp = true">ⓘ How does this work?</button>
+    </div>
+    <button class="btn btn-primary" @onclick="Refresh" disabled="@_loading">
+        @(_loading ? "Refreshing…" : "↻ Refresh")
+    </button>
+</div>
+
+<InfoModal @bind-Visible="_showHelp" Title="📊 How the Edge Finder works">
+    <p class="modal-lead">
+        Sharp books like <strong>Pinnacle</strong> take large, professional bets and post razor-thin
+        margins, so their line is the closest thing to the market's "true" probability. Public books
+        (DraftKings, FanDuel, BetMGM) shade their odds toward casual money. When a public book's price
+        is longer than Pinnacle's fair number, that gap is <strong>+EV</strong> — a mathematical edge.
+    </p>
+
+    <h3>1 · American odds → implied probability</h3>
+    <div class="formula">
+        <code>+odds → 100 / (odds + 100)</code>
+        <code>−odds → |odds| / (|odds| + 100)</code>
+    </div>
+
+    <h3>2 · Strip the vig (the bookmaker's cut)</h3>
+    <p>Each market's probabilities sum to more than 100% — that surplus is the "vig." We normalize
+        Pinnacle's outcomes by dividing each by their total, leaving a clean <em>true probability</em>.</p>
+    <div class="formula"><code>trueProb = pinnacleImplied / Σ(allOutcomes)</code></div>
+
+    <h3>3 · Compare against the public price</h3>
+    <div class="formula">
+        <code>decimal(+odds) = odds / 100 + 1</code>
+        <code>decimal(−odds) = 100 / |odds| + 1</code>
+        <code>EV = (trueProb × publicDecimal) − 1</code>
+    </div>
+
+    <h3>4 · Flag the edges</h3>
+    <ul class="modal-list">
+        <li><span class="legend-chip ev-value">EV &gt; 3%</span> &nbsp;<strong>Value</strong> — a real edge worth a look</li>
+        <li><span class="legend-chip ev-strong">EV &gt; 7%</span> &nbsp;<strong>Strong Value</strong> — a standout discrepancy</li>
+    </ul>
+    <p class="modal-note">The Pinnacle column is gold-bordered because it's the reference line, not a bet
+        target — the green cells are where the public books are paying more than the math says they should.</p>
+
+    <h3>Where the data comes from</h3>
+    <p>Live h2h &amp; totals odds are pulled from <strong>The Odds API</strong> (<code>soccer_fifa_world_cup</code>,
+        US region). If the API is unreachable or returns nothing, the app falls back to a realistic mock
+        dataset so you're never staring at a blank page.</p>
+</InfoModal>
+
+<div class="stats-bar">
+    <div class="stat">
+        <div class="stat-value">@_edges.Count</div>
+        <div class="stat-label">Matches Analyzed</div>
+    </div>
+    <div class="stat">
+        <div class="stat-value">@TotalValueBets</div>
+        <div class="stat-label">+EV Bets Found</div>
+    </div>
+    <div class="stat">
+        <div class="stat-value accent">@($"{BestEvPct:0.0}")%</div>
+        <div class="stat-label">Best EV Available</div>
+    </div>
+    <div class="stat">
+        <div class="stat-value small">@_lastUpdated.ToString("h:mm:ss tt")</div>
+        <div class="stat-label">Last Updated@(Odds.UsingMockData ? " · demo data" : "")</div>
+    </div>
+</div>
+
+<div class="filter-tabs">
+    @foreach (var (key, label) in Tabs)
+    {
+        <button class="filter-tab @(_filter == key ? "active" : "")" @onclick="() => _filter = key">
+            @label
+        </button>
+    }
+</div>
+
+@if (_loading)
+{
+    <div class="skeleton-list">
+        @for (var i = 0; i < 4; i++)
+        {
+            <div class="skeleton-card">
+                <div class="skeleton-line w-40"></div>
+                <div class="skeleton-line w-70"></div>
+                <div class="skeleton-line w-90"></div>
+                <div class="skeleton-line w-60"></div>
+            </div>
+        }
+    </div>
+}
+else if (VisibleEdges.Count == 0)
+{
+    <div class="empty-state">
+        <div class="empty-emoji">🔍</div>
+        <h2>No matches to show</h2>
+        <p>No bets match this filter right now. Try "All Bets" or hit refresh.</p>
+    </div>
+}
+else
+{
+    <div class="match-list">
+        @foreach (var edge in VisibleEdges)
+        {
+            <MatchCard Bet="edge" Filter="@_filter" />
+        }
+    </div>
+}
+
+<footer class="edge-footer">
+    Powered by <strong>Pinnacle Sharp Lines</strong> · EV = (Pinnacle true probability × public decimal odds) − 1
+</footer>
+
+@code {
+    private List<EVBet> _edges = new();
+    private bool _loading = true;
+    private bool _showHelp;
+    private string _filter = "all";
+    private DateTime _lastUpdated;
+
+    private static readonly (string key, string label)[] Tabs =
+    {
+        ("all", "All Bets"),
+        ("h2h", "Match Winner"),
+        ("totals", "Totals"),
+        ("strong", "Strong Value Only"),
+    };
+
+    protected override async Task OnInitializedAsync() => await Load();
+
+    private async Task Refresh() => await Load();
+
+    private async Task Load()
+    {
+        _loading = true;
+        StateHasChanged();
+
+        _edges = await Odds.GetEdgesAsync();
+        _lastUpdated = DateTime.Now;
+
+        _loading = false;
+    }
+
+    private List<EVBet> VisibleEdges => _filter == "strong"
+        ? _edges.Where(e => e.StrongValueBetCount > 0).ToList()
+        : _edges;
+
+    private int TotalValueBets => _edges.Sum(e => e.ValueBetCount + e.StrongValueBetCount);
+
+    private double BestEvPct => _edges.Count == 0 ? 0 : _edges.Max(e => e.BestEv) * 100;
+}

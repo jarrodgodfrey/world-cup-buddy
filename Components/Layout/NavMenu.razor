@@ -1,0 +1,38 @@
+<div class="nav-sidebar @(_collapsed ? "collapsed" : "")">
+    <div class="nav-brand">
+        <a href="" class="nav-logo">
+            <span class="nav-logo-ball">⚽</span>
+            <span class="nav-logo-text">World Cup <strong>Buddy</strong></span>
+        </a>
+        <button class="nav-toggle" @onclick="Toggle" aria-label="Toggle navigation">☰</button>
+    </div>
+
+    <nav class="nav-links">
+        <NavLink class="nav-item" href="edge-finder" @onclick="CloseOnMobile">
+            <span class="nav-icon">📊</span>
+            <span class="nav-label">Edge Finder</span>
+        </NavLink>
+        <NavLink class="nav-item" href="simulator" @onclick="CloseOnMobile">
+            <span class="nav-icon">🏆</span>
+            <span class="nav-label">Simulator</span>
+        </NavLink>
+        <NavLink class="nav-item" href="watch-parties" @onclick="CloseOnMobile">
+            <span class="nav-icon">🍺</span>
+            <span class="nav-label">Watch Parties</span>
+            <span class="nav-badge">Soon</span>
+        </NavLink>
+    </nav>
+
+    <div class="nav-footer">
+        <div class="nav-footer-line">Powered by</div>
+        <div class="nav-footer-brand">Pinnacle Sharp Lines</div>
+    </div>
+</div>
+
+@code {
+    private bool _collapsed = true;
+
+    private void Toggle() => _collapsed = !_collapsed;
+
+    private void CloseOnMobile() => _collapsed = true;
+}

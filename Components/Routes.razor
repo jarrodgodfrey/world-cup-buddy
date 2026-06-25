@@ -1,0 +1,16 @@
+<Router AppAssembly="@typeof(Program).Assembly">
+    <Found Context="routeData">
+        <RouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)" />
+        <FocusOnNavigate RouteData="@routeData" Selector="h1" />
+    </Found>
+    <NotFound>
+        <LayoutView Layout="@typeof(MainLayout)">
+            <div class="empty-state">
+                <div class="empty-emoji">🧭</div>
+                <h2>Page not found</h2>
+                <p>That route went out of bounds. Head back to the Edge Finder.</p>
+                <a class="btn btn-primary" href="edge-finder">Go to Edge Finder →</a>
+            </div>
+        </LayoutView>
+    </NotFound>
+</Router>

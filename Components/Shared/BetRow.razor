@@ -1,0 +1,34 @@
+@* One comparison row in the Edge Finder odds table. *@
+<tr>
+    <td class="bet-sel">@Row.Selection</td>
+    <td class="book-cell pinnacle-cell">@Fmt(Row.PinnacleAmerican)</td>
+    <td class="book-cell @EvClass(Row.DraftKingsEv)">@Fmt(Row.DraftKingsAmerican)</td>
+    <td class="book-cell @EvClass(Row.FanDuelEv)">@Fmt(Row.FanDuelAmerican)</td>
+    <td class="book-cell @EvClass(Row.BetMgmEv)">@Fmt(Row.BetMgmAmerican)</td>
+    <td class="ev-cell @EvClass(BestOrNull)">@FmtEv(BestOrNull)</td>
+</tr>
+
+@code {
+    [Parameter, EditorRequired] public OddsComparison Row { get; set; } = default!;
+
+    private double? BestOrNull =>
+        Row.BestEv == double.NegativeInfinity ? null : Row.BestEv;
+
+    private static string Fmt(double? american)
+    {
+        if (!american.HasValue) return "—";
+        var v = Math.Round(american.Value);
+        return v > 0 ? $"+{v:0}" : $"{v:0}";
+    }
+
+    private static string FmtEv(double? ev) =>
+        ev.HasValue ? $"{ev.Value * 100:+0.0;-0.0;0.0}%" : "—";
+
+    private static string EvClass(double? ev)
+    {
+        if (!ev.HasValue) return "";
+        if (ev.Value > OddsThresholds.StrongValue) return "ev-strong";
+        if (ev.Value > OddsThresholds.Value) return "ev-value";
+        return "";
+    }
+}

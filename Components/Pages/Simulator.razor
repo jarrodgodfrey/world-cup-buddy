@@ -1,0 +1,244 @@
+@page "/simulator"
+@rendermode InteractiveServer
+@inject SimulationService Sim
+@using System.Globalization
+
+<PageTitle>Simulator · World Cup Buddy</PageTitle>
+
+<div class="page-head">
+    <div>
+        <h1 class="page-title">Tournament Simulator</h1>
+        <p class="page-sub">10,000 simulations. Every path mapped.</p>
+        <button class="btn-ghost" @onclick="() => _showHelp = true">ⓘ How does this work?</button>
+    </div>
+    @if (_result is not null)
+    {
+        <span class="sim-timestamp">Last run @_result.RunAt.ToString("h:mm:ss tt")</span>
+    }
+</div>
+
+<InfoModal @bind-Visible="_showHelp" Title="🏆 How the Simulator works">
+    <p class="modal-lead">
+        Every team carries an <strong>Elo rating</strong> (loosely from FIFA rankings). For each match we
+        compute a win probability, roll the dice, and play out the entire tournament — group stage through
+        the final. Do that <strong>10,000 times</strong> and count how often each team reaches each round.
+    </p>
+
+    <h3>1 · The Elo win model</h3>
+    <p>The rating gap between two teams maps to a win probability:</p>
+    <div class="formula"><code>P(A beats B) = 1 / (1 + 10^((ratingB − ratingA) / 400))</code></div>
+    <p>A small <strong>±5% upset factor</strong> is added each match so favorites don't win mechanically —
+        Cinderella runs happen, just like the real thing.</p>
+
+    <h3>2 · Groups vs. knockouts</h3>
+    <ul class="modal-list">
+        <li><strong>Group stage:</strong> draws are allowed (closer matchups draw more often); W = 3, D = 1, L = 0. Top 2 of each group advance.</li>
+        <li><strong>Knockouts:</strong> no draws — the win probability regresses slightly toward 50/50 to model the coin-flip nature of extra time and penalties.</li>
+    </ul>
+
+    <h3>3 · Why 10,000 runs?</h3>
+    <p class="modal-clear">
+        A single tournament is mostly luck. But average thousands of independent random tournaments and the
+        results settle into a stable <strong>normal distribution</strong> — the
+        <em>law of large numbers</em>. The peak is the expected outcome; the spread is the uncertainty.
+    </p>
+
+    <BellCurve />
+
+    <h3>What the table shows</h3>
+    <p>Each cell is the share of simulations in which a team reached that round. <span class="legend-chip ev-value">deeper green</span>
+        = higher probability. <strong>Group Exit %</strong> is the chance of being knocked out in the group
+        stage. Hit <strong>Resimulate</strong> and the random seed changes — watch the dark horses shuffle.</p>
+</InfoModal>
+
+<div class="team-picker">
+    <div class="team-picker-label">Pick your team</div>
+    <div class="team-grid">
+        @foreach (var t in WorldCupData.Teams)
+        {
+            <button class="team-chip @(_selected == t.Name ? "selected" : "")"
+                    @onclick="() => Select(t.Name)" disabled="@_running">
+                <span class="team-chip-flag">@t.Flag</span>
+                <span class="team-chip-name">@t.Name</span>
+            </button>
+        }
+    </div>
+</div>
+
+<div class="sim-actions">
+    <button class="btn btn-primary" @onclick="RunSimulation" disabled="@(_running || _selected is null)">
+        @(_result is null ? "▶ Run Simulation" : "↻ Resimulate")
+    </button>
+    @if (_selected is null)
+    {
+        <span class="sim-hint">Select a team above to begin.</span>
+    }
+</div>
+
+@if (_running)
+{
+    <div class="sim-running">
+        <div class="sim-running-text">Running 10,000 simulations…</div>
+        <div class="sim-progress">
+            <div class="sim-progress-fill" style="width:@($"{_progress:0}")%"></div>
+        </div>
+        <div class="sim-progress-pct">@($"{_progress:0}")%</div>
+    </div>
+}
+
+@if (_result is not null && !_running)
+{
+    @if (_result.SelectedPath is not null)
+    {
+        <section class="sim-section">
+            <h2 class="section-title">Your Team's Path</h2>
+            <TeamPathCard Path="_result.SelectedPath" />
+        </section>
+    }
+
+    <section class="sim-section">
+        <h2 class="section-title">Full Bracket Probability</h2>
+        <div class="table-scroll">
+            <table class="prob-table">
+                <thead>
+                    <tr>
+                        @foreach (var col in Columns)
+                        {
+                            <th class="@(col.key == "team" ? "team-col" : "num-col") sortable @(SortIcon(col.key) != "" ? "sorted" : "")"
+                                @onclick="() => SortBy(col.key)">
+                                @col.label <span class="sort-icon">@SortIcon(col.key)</span>
+                            </th>
+                        }
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var t in SortedTeams)
+                    {
+                        <tr class="@(t.Team == _selected ? "row-selected" : "")">
+                            <td class="team-col">
+                                <span class="prob-flag">@t.Flag</span> @t.Team
+                                <span class="prob-group">@t.Group</span>
+                            </td>
+                            <td class="num-col" style="@RedCell(t.GroupExitPct)">@Pct(t.GroupExitPct)</td>
+                            <td class="num-col" style="@GreenCell(t.R16Pct)">@Pct(t.R16Pct)</td>
+                            <td class="num-col" style="@GreenCell(t.QfPct)">@Pct(t.QfPct)</td>
+                            <td class="num-col" style="@GreenCell(t.SfPct)">@Pct(t.SfPct)</td>
+                            <td class="num-col" style="@GreenCell(t.FinalPct)">@Pct(t.FinalPct)</td>
+                            <td class="num-col win-col" style="@GreenCell(t.WinPct)">@Pct(t.WinPct)</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="sim-section">
+        <h2 class="section-title">Projected Bracket <span class="section-tag">chalk</span></h2>
+        <BracketView Highlight="_selected" />
+    </section>
+}
+
+@code {
+    private string? _selected;
+    private BracketSimulation? _result;
+    private bool _running;
+    private bool _showHelp;
+    private double _progress;
+
+    private string _sortCol = "win";
+    private bool _sortDesc = true;
+
+    private static readonly (string key, string label)[] Columns =
+    {
+        ("team", "Team"),
+        ("exit", "Group Exit %"),
+        ("r16", "R16 %"),
+        ("qf", "QF %"),
+        ("sf", "SF %"),
+        ("final", "Final %"),
+        ("win", "Win %"),
+    };
+
+    private void Select(string team) => _selected = team;
+
+    private async Task RunSimulation()
+    {
+        _running = true;
+        _progress = 0;
+        StateHasChanged();
+
+        // Offload the CPU-bound run; animate the progress bar while it works.
+        var work = Task.Run(() => Sim.Run(_selected, SimulationService.DefaultIterations));
+        while (!work.IsCompleted && _progress < 95)
+        {
+            await Task.Delay(35);
+            _progress += 4;
+            StateHasChanged();
+        }
+
+        _result = await work;
+        _progress = 100;
+        StateHasChanged();
+        await Task.Delay(250);
+
+        _running = false;
+    }
+
+    private void SortBy(string col)
+    {
+        if (_sortCol == col) { _sortDesc = !_sortDesc; }
+        else { _sortCol = col; _sortDesc = col != "team" && col != "exit"; }
+    }
+
+    private string SortIcon(string col) =>
+        _sortCol != col ? "" : _sortDesc ? "▼" : "▲";
+
+    private IEnumerable<TeamSimResult> SortedTeams
+    {
+        get
+        {
+            if (_result is null) return Enumerable.Empty<TeamSimResult>();
+
+            Func<TeamSimResult, IComparable> key = _sortCol switch
+            {
+                "team" => t => t.Team,
+                "exit" => t => t.GroupExitPct,
+                "r16" => t => t.R16Pct,
+                "qf" => t => t.QfPct,
+                "sf" => t => t.SfPct,
+                "final" => t => t.FinalPct,
+                _ => t => t.WinPct,
+            };
+
+            var ordered = (_sortDesc
+                ? _result.Teams.OrderByDescending(key)
+                : _result.Teams.OrderBy(key)).ToList();
+
+            // Pin the selected team to the top.
+            if (_selected is not null)
+            {
+                var sel = ordered.FirstOrDefault(t => t.Team == _selected);
+                if (sel is not null)
+                {
+                    ordered.Remove(sel);
+                    ordered.Insert(0, sel);
+                }
+            }
+            return ordered;
+        }
+    }
+
+    private static string Pct(double v) => v.ToString("0.0", CultureInfo.InvariantCulture) + "%";
+
+    private static string GreenCell(double pct)
+    {
+        var a = Math.Min(0.6, pct / 100.0 * 0.65);
+        return $"background: rgba(0,255,100,{a.ToString("0.###", CultureInfo.InvariantCulture)});";
+    }
+
+    private static string RedCell(double pct)
+    {
+        var a = Math.Min(0.5, pct / 100.0 * 0.5);
+        return $"background: rgba(233,69,96,{a.ToString("0.###", CultureInfo.InvariantCulture)});";
+    }
+}

@@ -1,0 +1,47 @@
+@* Reusable explainer modal. Two-way bind Visible with @bind-Visible. *@
+@if (Visible)
+{
+    <div class="modal-backdrop" @onclick="CloseAsync">
+        <div class="modal card-hover" tabindex="0" @ref="_modalRef"
+             @onclick:stopPropagation="true" @onkeydown="OnKeyDown" role="dialog" aria-modal="true">
+            <div class="modal-head">
+                <h2 class="modal-title">@Title</h2>
+                <button class="modal-close" @onclick="CloseAsync" aria-label="Close">✕</button>
+            </div>
+            <div class="modal-body">
+                @ChildContent
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool Visible { get; set; }
+    [Parameter] public EventCallback<bool> VisibleChanged { get; set; }
+    [Parameter] public string Title { get; set; } = "";
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    private ElementReference _modalRef;
+    private bool _focusPending;
+
+    protected override void OnParametersSet()
+    {
+        if (Visible) _focusPending = true;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_focusPending)
+        {
+            _focusPending = false;
+            try { await _modalRef.FocusAsync(); } catch { /* element may be gone */ }
+        }
+    }
+
+    private async Task CloseAsync() => await VisibleChanged.InvokeAsync(false);
+
+    private async Task OnKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape") await CloseAsync();
+    }
+}

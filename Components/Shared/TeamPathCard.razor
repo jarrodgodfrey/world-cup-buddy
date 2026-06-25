@@ -1,0 +1,60 @@
+@* Section A: the selected team's horizontal path through the knockout rounds. *@
+<div class="path-card card-hover">
+    <div class="path-head">
+        <span class="path-flag">@Path.Flag</span>
+        <div>
+            <div class="path-team">@Path.Team</div>
+            <div class="path-sub">Group @Path.Group · Elo @Path.Rating</div>
+        </div>
+    </div>
+
+    <div class="path-timeline">
+        @for (var i = 0; i < Path.Nodes.Count; i++)
+        {
+            var node = Path.Nodes[i];
+            <div class="path-node">
+                <div class="path-node-round">@RoundLabel(node.Round)</div>
+                <div class="path-node-dot @ProbClass(node.ReachProb)">
+                    <span class="path-node-pct">@node.ReachProb.ToString("0.0")%</span>
+                </div>
+                @if (!string.IsNullOrEmpty(node.LikelyOpponent) && node.LikelyOpponent != "—")
+                {
+                    <div class="path-node-opp">
+                        <span class="path-node-opp-label">likely vs</span>
+                        <span class="path-node-opp-team">@node.LikelyOpponentFlag @node.LikelyOpponent</span>
+                    </div>
+                }
+                else
+                {
+                    <div class="path-node-opp path-node-opp-empty">🏆 lift the cup</div>
+                }
+            </div>
+            @if (i < Path.Nodes.Count - 1)
+            {
+                <div class="path-arrow">→</div>
+            }
+        }
+    </div>
+
+    <div class="path-narrative">
+        <div class="path-narrative-label">⚡ Path to Glory</div>
+        <p>@Path.Narrative</p>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public TeamPath Path { get; set; } = default!;
+
+    private static string RoundLabel(string round) => round switch
+    {
+        "R16" => "Round of 16",
+        "QF" => "Quarter-final",
+        "SF" => "Semi-final",
+        "Final" => "Final",
+        "Champion" => "Champion",
+        _ => round
+    };
+
+    private static string ProbClass(double pct) =>
+        pct > 50 ? "prob-high" : pct >= 20 ? "prob-mid" : "prob-low";
+}

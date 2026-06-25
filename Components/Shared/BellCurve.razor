@@ -1,0 +1,102 @@
+@* A themed normal-distribution graphic, generated as an SVG path.
+   Illustrates how aggregating thousands of independent simulations makes the
+   estimated probabilities converge (central limit theorem / law of large numbers). *@
+@using System.Globalization
+
+<div class="bell">
+    <svg viewBox="0 0 320 200" width="100%" preserveAspectRatio="xMidYMid meet" role="img"
+         aria-label="Normal distribution curve with the central ±1 standard deviation region shaded">
+        <defs>
+            <linearGradient id="bellArea" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#e94560" stop-opacity="0.55" />
+                <stop offset="100%" stop-color="#0f3460" stop-opacity="0.05" />
+            </linearGradient>
+            <linearGradient id="bellSigma" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#f5a623" stop-opacity="0.85" />
+                <stop offset="100%" stop-color="#f5a623" stop-opacity="0.1" />
+            </linearGradient>
+        </defs>
+
+        <!-- baseline axis -->
+        <line x1="@L" y1="@Base" x2="@(L + W)" y2="@Base" stroke="rgba(255,255,255,0.25)" stroke-width="1" />
+
+        <!-- full distribution area -->
+        <path d="@_areaPath" fill="url(#bellArea)" />
+        <!-- central ±1σ band -->
+        <path d="@_sigmaPath" fill="url(#bellSigma)" />
+        <!-- the curve itself -->
+        <path d="@_curvePath" fill="none" stroke="#ffffff" stroke-width="2.5" stroke-linejoin="round" />
+
+        <!-- mean line -->
+        <line x1="@X(0)" y1="@(Base)" x2="@X(0)" y2="@(Peak - 6)"
+              stroke="#f5a623" stroke-width="1.5" stroke-dasharray="4 3" />
+
+        <!-- sigma ticks -->
+        <line x1="@X(-1)" y1="@(Base - 5)" x2="@X(-1)" y2="@(Base + 5)" stroke="#f5a623" stroke-width="1.5" />
+        <line x1="@X(1)"  y1="@(Base - 5)" x2="@X(1)"  y2="@(Base + 5)" stroke="#f5a623" stroke-width="1.5" />
+
+        <!-- labels -->
+        <text x="@X(0)"  y="@(Peak - 10)" class="bell-label bell-mean" text-anchor="middle">most-likely outcome</text>
+        <text x="@X(-1)" y="@(Base + 18)" class="bell-tick" text-anchor="middle">−1σ</text>
+        <text x="@X(1)"  y="@(Base + 18)" class="bell-tick" text-anchor="middle">+1σ</text>
+        <text x="@X(-3.4)" y="@(Base + 18)" class="bell-tick" text-anchor="middle">upsets</text>
+        <text x="@X(3.4)"  y="@(Base + 18)" class="bell-tick" text-anchor="middle">upsets</text>
+    </svg>
+    <div class="bell-caption">
+        Each of the 10,000 runs is one random tournament. Average them and the noise cancels out —
+        the <strong>±1σ</strong> band is where ~68% of outcomes land, and that's the probability we report.
+    </div>
+</div>
+
+@code {
+    // SVG layout constants.
+    private const double L = 12;     // left padding
+    private const double W = 296;    // plot width
+    private const double Base = 168; // baseline y
+    private const double Height = 150;
+    private double Peak => Base - Height;
+
+    private string _areaPath = "";
+    private string _sigmaPath = "";
+    private string _curvePath = "";
+
+    // Map a z-score (-4..4) to an x coordinate.
+    private double X(double z) => L + W * (z + 4.0) / 8.0;
+
+    private static double Gauss(double z) => Math.Exp(-0.5 * z * z);
+    private double Y(double z) => Base - Gauss(z) * Height;
+
+    private static string N(double v) => v.ToString("0.##", CultureInfo.InvariantCulture);
+
+    protected override void OnInitialized()
+    {
+        const int samples = 96;
+
+        var curve = new System.Text.StringBuilder();
+        var area = new System.Text.StringBuilder();
+        area.Append($"M {N(X(-4))} {N(Base)} ");
+
+        for (var i = 0; i <= samples; i++)
+        {
+            var z = -4.0 + 8.0 * i / samples;
+            var cmd = i == 0 ? "M" : "L";
+            curve.Append($"{cmd} {N(X(z))} {N(Y(z))} ");
+            area.Append($"L {N(X(z))} {N(Y(z))} ");
+        }
+        area.Append($"L {N(X(4))} {N(Base)} Z");
+
+        _curvePath = curve.ToString();
+        _areaPath = area.ToString();
+
+        // ±1σ band.
+        var sigma = new System.Text.StringBuilder();
+        sigma.Append($"M {N(X(-1))} {N(Base)} ");
+        for (var i = 0; i <= samples; i++)
+        {
+            var z = -1.0 + 2.0 * i / samples;
+            sigma.Append($"L {N(X(z))} {N(Y(z))} ");
+        }
+        sigma.Append($"L {N(X(1))} {N(Base)} Z");
+        _sigmaPath = sigma.ToString();
+    }
+}

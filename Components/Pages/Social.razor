@@ -1,0 +1,59 @@
+@page "/watch-parties"
+@inject SocialService SocialSvc
+
+<PageTitle>Watch Parties · World Cup Buddy</PageTitle>
+
+<div class="page-head">
+    <div>
+        <h1 class="page-title">Watch Party Finder</h1>
+        <p class="page-sub">Find the best bars and venues near you</p>
+    </div>
+</div>
+
+<div class="social-stage">
+    <!-- Blurred preview mockup behind the overlay -->
+    <div class="social-preview" aria-hidden="true">
+        <div class="social-map">
+            <div class="social-map-grid"></div>
+            <div class="social-pin" style="top:30%; left:25%;">📍</div>
+            <div class="social-pin" style="top:55%; left:60%;">📍</div>
+            <div class="social-pin" style="top:42%; left:45%;">📍</div>
+            <div class="social-pin social-pin-you" style="top:50%; left:40%;">🧍 You</div>
+        </div>
+
+        <div class="social-venues">
+            @foreach (var v in _venues)
+            {
+                <div class="venue-card">
+                    <div class="venue-emoji">@v.Emoji</div>
+                    <div class="venue-body">
+                        <div class="venue-name">@v.Name</div>
+                        <div class="venue-type">@v.VenueType · @v.DistanceMiles.ToString("0.0") mi · ⭐ @v.Rating.ToString("0.0")</div>
+                        <div class="venue-showing">📺 @v.ShowingMatch</div>
+                    </div>
+                    <div class="venue-watching">👀 @v.WatchingCount watching</div>
+                </div>
+            }
+            <button class="btn btn-primary social-create">＋ Create Watch Party</button>
+        </div>
+    </div>
+
+    <!-- Coming Soon overlay -->
+    <div class="social-overlay">
+        <div class="social-overlay-card">
+            <div class="social-overlay-ball">⚽</div>
+            <h2 class="social-overlay-title">Watch Party Finder</h2>
+            <div class="social-overlay-badge">Coming Soon</div>
+            <p class="social-overlay-text">
+                We're building the best way to find fans, bars, and watch parties near you for every
+                World Cup 2026 match. Hang tight — this one's worth the wait.
+            </p>
+        </div>
+    </div>
+</div>
+
+@code {
+    private List<SocialVenue> _venues = new();
+
+    protected override void OnInitialized() => _venues = SocialSvc.PreviewVenues();
+}

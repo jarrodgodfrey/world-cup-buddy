@@ -13,8 +13,10 @@ builder.Services.AddMudServices();
 
 // Feature services.
 builder.Services.AddHttpClient<OddsService>();
+builder.Services.AddHttpClient<ProfileService>();
 builder.Services.AddScoped<SimulationService>();
 builder.Services.AddScoped<SocialService>();
+builder.Services.AddScoped<ProfileState>();
 
 var app = builder.Build();
 

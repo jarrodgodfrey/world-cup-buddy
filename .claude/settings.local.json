@@ -17,10 +17,10 @@
       "Read(//private/tmp/**)",
       "Bash(kill 45156)",
       "Bash(pkill -f \"WorldCupBuddy.dll\")",
-      "Bash(curl -s -D - -o /tmp/odds.json \"https://api.the-odds-api.com/v4/sports/soccer_fifa_world_cup_2026/odds?apiKey=48fd24d0216de4f488415d60aeae9b14&regions=us&markets=h2h,totals&oddsFormat=american&bookmakers=pinnacle,draftkings,fanduel,betmgm\")",
-      "Bash(curl -s \"https://api.the-odds-api.com/v4/sports/?apiKey=48fd24d0216de4f488415d60aeae9b14&all=true\")",
+      "Bash(curl -s -D - -o /tmp/odds.json \"https://api.the-odds-api.com/v4/sports/soccer_fifa_world_cup_2026/odds?apiKey=REDACTED&regions=us&markets=h2h,totals&oddsFormat=american&bookmakers=pinnacle,draftkings,fanduel,betmgm\")",
+      "Bash(curl -s \"https://api.the-odds-api.com/v4/sports/?apiKey=REDACTED&all=true\")",
       "Bash(python3 -c ' *)",
-      "Bash(curl -s -D - -o /tmp/wc.json \"https://api.the-odds-api.com/v4/sports/soccer_fifa_world_cup/odds?apiKey=48fd24d0216de4f488415d60aeae9b14&regions=us&markets=h2h,totals&oddsFormat=american&bookmakers=pinnacle,draftkings,fanduel,betmgm\")",
+      "Bash(curl -s -D - -o /tmp/wc.json \"https://api.the-odds-api.com/v4/sports/soccer_fifa_world_cup/odds?apiKey=REDACTED&regions=us&markets=h2h,totals&oddsFormat=american&bookmakers=pinnacle,draftkings,fanduel,betmgm\")",
       "Bash(python3 *)",
       "Bash(grep -vE \"warn|Determining|Restored|^\\\\s*$\")",
       "Bash(curl -s \"https://api.nuget.org/v3-flatcontainer/mudblazor/index.json\")",
@@ -41,7 +41,11 @@
       "Bash(az appservice *)",
       "Bash(az webapp *)",
       "Bash(zip -r -q ../app.zip .)",
-      "Bash(az resource *)"
+      "Bash(az resource *)",
+      "Skill(claude-api)",
+      "Bash(git --no-pager diff --stat)",
+      "Bash(git add *)",
+      "Bash(git commit *)"
     ]
   }
 }

@@ -1,5 +1,7 @@
 @page "/simulator"
 @inject SimulationService Sim
+@inject ProfileState ProfileStore
+@inject IJSRuntime JS
 @using System.Globalization
 
 <PageTitle>Simulator · World Cup Buddy</PageTitle>
@@ -49,6 +51,14 @@
         = higher probability. <strong>Group Exit %</strong> is the chance of being knocked out in the group
         stage. Hit <strong>Resimulate</strong> and the random seed changes — watch the dark horses shuffle.</p>
 </InfoModal>
+
+@if (ProfileStore.Current?.TeamIsInField == true)
+{
+    <div class="profile-banner">
+        ⭐ Auto-selected from your profile:
+        <strong>@ProfileStore.Current.Flag @ProfileStore.Current.FavoriteTeam</strong>
+    </div>
+}
 
 <div class="team-picker">
     <div class="team-picker-label">Pick your team</div>
@@ -170,9 +180,36 @@
         YAxisTicks = 2,
     };
 
+    private bool _autoRan;
+
     private void Select(string team) => _selected = team;
 
     private string RowClass(TeamSimResult t, int _) => t.Team == _selected ? "row-selected" : "";
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || _autoRan || _result is not null) return;
+
+        // Survive full refreshes: load a saved profile from localStorage.
+        if (ProfileStore.Current is null)
+        {
+            try
+            {
+                var json = await JS.InvokeAsync<string?>("localStorage.getItem", ProfileState.StorageKey);
+                ProfileStore.LoadFromJson(json);
+            }
+            catch { /* localStorage unavailable */ }
+        }
+
+        // Personalize: auto-select and run the profile's team.
+        if (ProfileStore.Current is { } p && p.TeamIsInField)
+        {
+            _autoRan = true;
+            _selected = p.FavoriteTeam;
+            StateHasChanged(); // show banner + selection immediately
+            await RunSimulation();
+        }
+    }
 
     private async Task RunSimulation()
     {
@@ -196,6 +233,9 @@
         await Task.Delay(250);
 
         _running = false;
+        // Explicit re-render: when auto-run is triggered from OnAfterRenderAsync
+        // (profile flow), Blazor does not auto-render after the call completes.
+        StateHasChanged();
     }
 
     private void BuildCharts()

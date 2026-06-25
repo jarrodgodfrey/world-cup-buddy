@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
@@ -8,6 +8,7 @@
     <!-- Only the .NET 9 shared runtime is present on some machines; allow this
          net8.0 app to roll forward and run on it without a separate install. -->
     <RollForward>LatestMajor</RollForward>
+    <UserSecretsId>a297c7ad-fc61-4d7a-ab5b-abe3da6fe4c8</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>

@@ -1,5 +1,7 @@
 @page "/edge-finder"
 @inject OddsService Odds
+@inject ProfileState ProfileStore
+@inject IJSRuntime JS
 
 <PageTitle>Edge Finder · World Cup Buddy</PageTitle>
 
@@ -85,6 +87,18 @@
     </MudPaper>
 }
 
+@if (!string.IsNullOrEmpty(_teamFilter))
+{
+    <div class="profile-banner">
+        <span>⭐ Showing matches for your team: <strong>@WorldCupData.Flag(_teamFilter) @_teamFilter</strong></span>
+        @if (!_teamHasMatches)
+        {
+            <span class="profile-banner-note">No upcoming @_teamFilter matches in the feed yet — showing all.</span>
+        }
+        <button class="profile-banner-clear" @onclick="() => _teamFilter = null">show all ✕</button>
+    </div>
+}
+
 <div class="filter-tabs">
     @foreach (var (key, label) in Tabs)
     {
@@ -135,6 +149,7 @@ else
     private bool _loading = true;
     private bool _showHelp;
     private string _filter = "all";
+    private string? _teamFilter;
     private DateTime _lastUpdated;
 
     // EV bar chart.
@@ -154,7 +169,34 @@ else
         ("strong", "Strong Value Only"),
     };
 
-    protected override async Task OnInitializedAsync() => await Load();
+    protected override async Task OnInitializedAsync()
+    {
+        // Personalize: if a profile is set, jump to that team's matches.
+        if (ProfileStore.Current?.HasTeam == true)
+            _teamFilter = ProfileStore.Current.FavoriteTeam;
+        await Load();
+    }
+
+    private bool _rehydrated;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // Survive full refreshes: load a saved profile and apply its team filter.
+        if (firstRender && !_rehydrated && ProfileStore.Current is null)
+        {
+            _rehydrated = true;
+            try
+            {
+                var json = await JS.InvokeAsync<string?>("localStorage.getItem", ProfileState.StorageKey);
+                if (ProfileStore.LoadFromJson(json) && ProfileStore.Current!.HasTeam && _teamFilter is null)
+                {
+                    _teamFilter = ProfileStore.Current.FavoriteTeam;
+                    StateHasChanged();
+                }
+            }
+            catch { /* localStorage unavailable */ }
+        }
+    }
 
     private async Task Refresh() => await Load();
 
@@ -187,9 +229,29 @@ else
     private static string Abbr(string team) =>
         team.Length >= 3 ? team[..3].ToUpperInvariant() : team.ToUpperInvariant();
 
-    private List<EVBet> VisibleEdges => _filter == "strong"
-        ? _edges.Where(e => e.StrongValueBetCount > 0).ToList()
-        : _edges;
+    private bool _teamHasMatches;
+
+    private List<EVBet> VisibleEdges
+    {
+        get
+        {
+            IEnumerable<EVBet> q = _edges;
+            if (_filter == "strong")
+                q = q.Where(e => e.StrongValueBetCount > 0);
+
+            if (!string.IsNullOrEmpty(_teamFilter))
+            {
+                var teamGames = q.Where(e => Involves(e, _teamFilter!)).ToList();
+                _teamHasMatches = teamGames.Count > 0;
+                if (_teamHasMatches) q = teamGames; // otherwise fall through to all
+            }
+            return q.ToList();
+        }
+    }
+
+    private static bool Involves(EVBet e, string team) =>
+        e.HomeTeam.Equals(team, StringComparison.OrdinalIgnoreCase) ||
+        e.AwayTeam.Equals(team, StringComparison.OrdinalIgnoreCase);
 
     private int TotalValueBets => _edges.Sum(e => e.ValueBetCount + e.StrongValueBetCount);
 

@@ -1,0 +1,287 @@
+@page "/profile"
+@inject ProfileService Profiles
+@inject ProfileState ProfileStore
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+@implements IAsyncDisposable
+
+<PageTitle>Build Profile · World Cup Buddy</PageTitle>
+
+<div class="page-head">
+    <div>
+        <h1 class="page-title">Build Your Profile</h1>
+        <p class="page-sub">Just talk — AI does the rest</p>
+    </div>
+</div>
+
+<div class="profile-stage">
+    @if (_phase != Phase.Done)
+    {
+        <div class="voice-panel card-hover">
+            <button class="mic-btn @(_phase == Phase.Recording ? "recording" : "")"
+                    @onclick="ToggleRecording" disabled="@(_phase == Phase.Building)">
+                <span class="mic-icon">@(_phase == Phase.Recording ? "■" : "🎙️")</span>
+            </button>
+
+            <div class="voice-status">
+                @switch (_phase)
+                {
+                    case Phase.Idle:
+                        <span>Tap the mic and tell me about yourself</span>
+                        break;
+                    case Phase.Recording:
+                        <span class="rec-dot">●</span> <span>Listening… tap again when you're done</span>
+                        break;
+                    case Phase.Building:
+                        <span>@(Profiles.AiConfigured ? "AI is building your profile…" : "Building your profile…")</span>
+                        break;
+                }
+            </div>
+
+            <p class="voice-hint">
+                Try: <em>"I'm a huge Brazil fan, I love watching Vinicius Jr, I like finding value bets
+                but I don't want to risk too much, and I always watch games at a sports bar with friends."</em>
+            </p>
+
+            @if (!string.IsNullOrWhiteSpace(_transcript))
+            {
+                <div class="transcript-box">@_transcript</div>
+            }
+
+            @if (_phase == Phase.Building)
+            {
+                <LoadingSpinner Label="Analyzing…" />
+            }
+
+            @if (!string.IsNullOrEmpty(_error))
+            {
+                <div class="voice-error">@_error</div>
+            }
+
+            <details class="voice-fallback">
+                <summary>No microphone? Type it instead</summary>
+                <textarea class="fallback-input" rows="3" @bind="_transcript" @bind:event="oninput"
+                          placeholder="Describe yourself as a fan…"></textarea>
+                <button class="btn btn-primary" @onclick="BuildFromText"
+                        disabled="@(_phase == Phase.Building || string.IsNullOrWhiteSpace(_transcript))">
+                    Build from text
+                </button>
+            </details>
+        </div>
+    }
+    else if (_profile is not null)
+    {
+        <div class="profile-card card-hover fade-in">
+            <div class="profile-card-head">
+                <span class="profile-flag">@_profile.Flag</span>
+                <div>
+                    <div class="profile-team">@(_profile.HasTeam ? _profile.FavoriteTeam : "Your Profile")</div>
+                    <div class="profile-summary">@_profile.Summary</div>
+                </div>
+                <span class="profile-source">@(Profiles.LastUsedAi ? "✨ Built by Claude" : "Built locally")</span>
+            </div>
+
+            <div class="profile-grid">
+                @if (_profile.FavoritePlayers.Count > 0)
+                {
+                    <div class="profile-tile">
+                        <div class="profile-tile-label">⭐ Favorite players</div>
+                        <div class="profile-tile-value">@string.Join(", ", _profile.FavoritePlayers)</div>
+                    </div>
+                }
+                @if (!string.IsNullOrWhiteSpace(_profile.Location))
+                {
+                    <div class="profile-tile">
+                        <div class="profile-tile-label">📍 Location</div>
+                        <div class="profile-tile-value">@_profile.Location</div>
+                    </div>
+                }
+                @if (!string.IsNullOrWhiteSpace(_profile.BarVibe))
+                {
+                    <div class="profile-tile">
+                        <div class="profile-tile-label">🍺 Watch vibe</div>
+                        <div class="profile-tile-value">@_profile.BarVibe</div>
+                    </div>
+                }
+                @if (!string.IsNullOrWhiteSpace(_profile.BettingStyle))
+                {
+                    <div class="profile-tile">
+                        <div class="profile-tile-label">📊 Betting style</div>
+                        <div class="profile-tile-value">@_profile.BettingStyle</div>
+                    </div>
+                }
+                <div class="profile-tile">
+                    <div class="profile-tile-label">🎚️ Risk tolerance</div>
+                    <div class="profile-tile-value risk-@_profile.RiskTolerance.ToLower()">@_profile.RiskTolerance</div>
+                </div>
+            </div>
+
+            <div class="profile-actions">
+                @if (_profile.HasTeam)
+                {
+                    <button class="btn btn-primary" @onclick="GoToEdges">
+                        📊 See @_profile.FavoriteTeam's edges →
+                    </button>
+                    @if (_profile.TeamIsInField)
+                    {
+                        <button class="btn btn-primary" @onclick="GoToSimulator">
+                            🏆 Run @_profile.FavoriteTeam simulation →
+                        </button>
+                    }
+                }
+                <button class="btn-ghost" @onclick="Reset">↺ Start over</button>
+            </div>
+
+            @if (_profile.HasTeam)
+            {
+                <div class="profile-active-note">
+                    ✅ @_profile.FavoriteTeam is now active across <strong>Edge Finder</strong>
+                    @(_profile.TeamIsInField ? " and the Simulator" : "").
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private enum Phase { Idle, Recording, Building, Done }
+
+    private Phase _phase = Phase.Idle;
+    private string _transcript = "";
+    private string? _error;
+    private UserProfile? _profile;
+    private DotNetObjectReference<Profile>? _ref;
+    private bool _rehydrated;
+
+    protected override void OnInitialized()
+    {
+        // If they already built a profile this circuit, show it.
+        if (ProfileStore.Current is not null)
+            ShowStored();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // Survive full refreshes: pull a saved profile from localStorage.
+        if (firstRender && !_rehydrated && ProfileStore.Current is null)
+        {
+            _rehydrated = true;
+            try
+            {
+                var json = await JS.InvokeAsync<string?>("localStorage.getItem", ProfileState.StorageKey);
+                if (ProfileStore.LoadFromJson(json))
+                {
+                    ShowStored();
+                    StateHasChanged();
+                }
+            }
+            catch { /* localStorage unavailable */ }
+        }
+    }
+
+    private void ShowStored()
+    {
+        _profile = ProfileStore.Current;
+        _transcript = _profile?.SourceTranscript ?? "";
+        _phase = Phase.Done;
+    }
+
+    private async Task ToggleRecording()
+    {
+        if (_phase == Phase.Recording)
+        {
+            await JS.InvokeVoidAsync("wcbSpeech.stop");
+            return; // OnSpeechEnd will advance to Building
+        }
+
+        _error = null;
+        _transcript = "";
+        _ref ??= DotNetObjectReference.Create(this);
+
+        var supported = await JS.InvokeAsync<bool>("wcbSpeech.supported");
+        if (!supported)
+        {
+            _error = "Voice input isn't supported in this browser. Use Chrome/Edge, or type below.";
+            return;
+        }
+
+        _phase = Phase.Recording;
+        await JS.InvokeVoidAsync("wcbSpeech.start", _ref);
+    }
+
+    [JSInvokable]
+    public Task OnTranscript(string text)
+    {
+        _transcript = text;
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    [JSInvokable]
+    public async Task OnSpeechEnd(string finalText)
+    {
+        if (!string.IsNullOrWhiteSpace(finalText))
+            _transcript = finalText;
+        await BuildAsync();
+    }
+
+    [JSInvokable]
+    public Task OnSpeechError(string error)
+    {
+        _phase = Phase.Idle;
+        _error = error == "unsupported"
+            ? "Voice input isn't supported in this browser. Use Chrome/Edge, or type below."
+            : error == "not-allowed" || error == "service-not-allowed"
+                ? "Microphone permission was blocked. Allow it in your browser, or type below."
+                : $"Couldn't capture audio ({error}). Try again or type below.";
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    private async Task BuildFromText()
+    {
+        await JS.InvokeVoidAsync("wcbSpeech.stop");
+        await BuildAsync();
+    }
+
+    private async Task BuildAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_transcript))
+        {
+            _phase = Phase.Idle;
+            return;
+        }
+
+        _phase = Phase.Building;
+        StateHasChanged();
+
+        _profile = await Profiles.BuildProfileAsync(_transcript);
+        ProfileStore.Set(_profile);
+        try { await JS.InvokeVoidAsync("localStorage.setItem", ProfileState.StorageKey, ProfileStore.ToJson()); }
+        catch { /* localStorage unavailable */ }
+
+        _phase = Phase.Done;
+        StateHasChanged();
+    }
+
+    private async Task Reset()
+    {
+        await JS.InvokeVoidAsync("wcbSpeech.stop");
+        ProfileStore.Clear();
+        try { await JS.InvokeVoidAsync("localStorage.removeItem", ProfileState.StorageKey); }
+        catch { /* localStorage unavailable */ }
+        _profile = null;
+        _transcript = "";
+        _error = null;
+        _phase = Phase.Idle;
+    }
+
+    private void GoToEdges() => Nav.NavigateTo("edge-finder");
+    private void GoToSimulator() => Nav.NavigateTo("simulator");
+
+    public async ValueTask DisposeAsync()
+    {
+        try { await JS.InvokeVoidAsync("wcbSpeech.stop"); } catch { /* circuit gone */ }
+        _ref?.Dispose();
+    }
+}

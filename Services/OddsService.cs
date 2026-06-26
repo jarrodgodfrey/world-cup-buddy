@@ -114,7 +114,8 @@ public class OddsService
                 {
                     Name = o.Name ?? "",
                     Price = o.Price,
-                    Point = o.Point
+                    Point = o.Point,
+                    Link = o.Link
                 }).ToList()
             }).ToList()
         }).ToList()
@@ -193,6 +194,9 @@ public class OddsService
                 DraftKingsAmerican = PublicPrice(m, "draftkings", "h2h", outcome),
                 FanDuelAmerican = PublicPrice(m, "fanduel", "h2h", outcome),
                 BetMgmAmerican = PublicPrice(m, "betmgm", "h2h", outcome),
+                DraftKingsLink = PublicLink(m, "draftkings", "h2h", outcome),
+                FanDuelLink = PublicLink(m, "fanduel", "h2h", outcome),
+                BetMgmLink = PublicLink(m, "betmgm", "h2h", outcome),
             }.WithEv();
         }
     }
@@ -232,6 +236,9 @@ public class OddsService
                 DraftKingsAmerican = PublicTotalsPrice(m, "draftkings", side, point),
                 FanDuelAmerican = PublicTotalsPrice(m, "fanduel", side, point),
                 BetMgmAmerican = PublicTotalsPrice(m, "betmgm", side, point),
+                DraftKingsLink = PublicTotalsLink(m, "draftkings", side, point),
+                FanDuelLink = PublicTotalsLink(m, "fanduel", side, point),
+                BetMgmLink = PublicTotalsLink(m, "betmgm", side, point),
             }.WithEv();
         }
     }
@@ -239,6 +246,14 @@ public class OddsService
     private static double? PublicPrice(Match m, string book, string market, string outcome) =>
         m.Book(book)?.Market(market)?.Outcomes
             .FirstOrDefault(o => o.Name.Equals(outcome, StringComparison.OrdinalIgnoreCase))?.Price;
+
+    private static string? PublicLink(Match m, string book, string market, string outcome) =>
+        m.Book(book)?.Market(market)?.Outcomes
+            .FirstOrDefault(o => o.Name.Equals(outcome, StringComparison.OrdinalIgnoreCase))?.Link;
+
+    private static string? PublicTotalsLink(Match m, string book, string side, double point) =>
+        m.Book(book)?.Market("totals")?.Outcomes
+            .FirstOrDefault(o => o.Name.Equals(side, StringComparison.OrdinalIgnoreCase) && o.Point == point)?.Link;
 
     private static double? PublicTotalsPrice(Match m, string book, string side, double point) =>
         m.Book(book)?.Market("totals")?.Outcomes
@@ -403,6 +418,7 @@ public class OddsService
         public string? Name { get; set; }
         public double Price { get; set; }
         public double? Point { get; set; }
+        public string? Link { get; set; }
     }
 }
 

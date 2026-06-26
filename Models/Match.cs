@@ -42,4 +42,7 @@ public class OutcomeOdds
 
     /// <summary>The total line for over/under markets (e.g. 2.5).</summary>
     public double? Point { get; set; }
+
+    /// <summary>Optional bet-slip deep link (only on Odds API plans with links enabled).</summary>
+    public string? Link { get; set; }
 }

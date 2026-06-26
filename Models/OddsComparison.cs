@@ -23,6 +23,11 @@ public class OddsComparison
     public double? FanDuelAmerican { get; set; }
     public double? BetMgmAmerican { get; set; }
 
+    // Optional bet-slip deep links per book (null unless the API provides them).
+    public string? DraftKingsLink { get; set; }
+    public string? FanDuelLink { get; set; }
+    public string? BetMgmLink { get; set; }
+
     // Expected value per book (decimal, e.g. 0.05 == +5%).
     public double? DraftKingsEv { get; set; }
     public double? FanDuelEv { get; set; }

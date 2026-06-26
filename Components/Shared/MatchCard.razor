@@ -33,9 +33,9 @@
             <RowTemplate>
                 <MudTd DataLabel="Bet" Class="bet-sel">@context.Selection</MudTd>
                 <MudTd DataLabel="Pinnacle" Class="pinnacle-cell">@Fmt(context.PinnacleAmerican)</MudTd>
-                <MudTd DataLabel="DraftKings" Class="@($"book-cell {EvClass(context.DraftKingsEv)}")">@Fmt(context.DraftKingsAmerican)</MudTd>
-                <MudTd DataLabel="FanDuel" Class="@($"book-cell {EvClass(context.FanDuelEv)}")">@Fmt(context.FanDuelAmerican)</MudTd>
-                <MudTd DataLabel="BetMGM" Class="@($"book-cell {EvClass(context.BetMgmEv)}")">@Fmt(context.BetMgmAmerican)</MudTd>
+                <MudTd DataLabel="DraftKings" Class="@($"book-cell {EvClass(context.DraftKingsEv)}")">@BookOdds(context.DraftKingsAmerican, context.DraftKingsLink, "draftkings")</MudTd>
+                <MudTd DataLabel="FanDuel" Class="@($"book-cell {EvClass(context.FanDuelEv)}")">@BookOdds(context.FanDuelAmerican, context.FanDuelLink, "fanduel")</MudTd>
+                <MudTd DataLabel="BetMGM" Class="@($"book-cell {EvClass(context.BetMgmEv)}")">@BookOdds(context.BetMgmAmerican, context.BetMgmLink, "betmgm")</MudTd>
                 <MudTd DataLabel="EV%" Class="@($"ev-cell {EvClass(BestOf(context))}")">@FmtEv(BestOf(context))</MudTd>
             </RowTemplate>
         </MudTable>
@@ -68,6 +68,35 @@
 
     private static string FmtEv(double? ev) =>
         ev.HasValue ? $"{ev.Value * 100:+0.0;-0.0;0.0}%" : "—";
+
+    // Sportsbook landing pages (soccer). Used when the API provides no bet-slip deep link.
+    private static string BookUrl(string bookKey) => bookKey switch
+    {
+        "draftkings" => "https://sportsbook.draftkings.com/leagues/soccer",
+        "fanduel" => "https://sportsbook.fanduel.com/navigation/soccer",
+        "betmgm" => "https://sports.betmgm.com/en/sports/soccer-4",
+        _ => "https://www.google.com/search?q=sportsbook"
+    };
+
+    private static string Href(string? deepLink, string bookKey) =>
+        string.IsNullOrWhiteSpace(deepLink) ? BookUrl(bookKey) : deepLink!;
+
+    /// <summary>Renders a clickable odds value linking to the sportsbook (or "—" when no line).</summary>
+    private RenderFragment BookOdds(double? american, string? link, string bookKey) => builder =>
+    {
+        if (!american.HasValue)
+        {
+            builder.AddContent(0, "—");
+            return;
+        }
+        builder.OpenElement(1, "a");
+        builder.AddAttribute(2, "class", "book-link");
+        builder.AddAttribute(3, "href", Href(link, bookKey));
+        builder.AddAttribute(4, "target", "_blank");
+        builder.AddAttribute(5, "rel", "noopener");
+        builder.AddContent(6, Fmt(american));
+        builder.CloseElement();
+    };
 
     private static string EvClass(double? ev)
     {

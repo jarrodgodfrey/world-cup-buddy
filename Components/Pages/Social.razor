@@ -1,59 +1,180 @@
 @page "/watch-parties"
-@inject SocialService SocialSvc
+@inject SocialService Venues
+@inject ProfileState ProfileStore
+@inject IJSRuntime JS
 
 <PageTitle>Watch Parties · World Cup Buddy</PageTitle>
 
 <div class="page-head">
     <div>
         <h1 class="page-title">Watch Party Finder</h1>
-        <p class="page-sub">Find the best bars and venues near you</p>
+        <p class="page-sub">Where to watch the game near you</p>
     </div>
 </div>
 
-<div class="social-stage">
-    <!-- Blurred preview mockup behind the overlay -->
-    <div class="social-preview" aria-hidden="true">
-        <div class="social-map">
-            <div class="social-map-grid"></div>
-            <div class="social-pin" style="top:30%; left:25%;">📍</div>
-            <div class="social-pin" style="top:55%; left:60%;">📍</div>
-            <div class="social-pin" style="top:42%; left:45%;">📍</div>
-            <div class="social-pin social-pin-you" style="top:50%; left:40%;">🧍 You</div>
-        </div>
+<div class="wp-controls">
+    <div class="wp-location">
+        <span class="wp-loc-icon">📍</span>
+        <input class="wp-input" placeholder="Enter your city…" @bind="_city" @bind:event="oninput"
+               @onkeydown="OnKey" />
+        <button class="btn btn-primary" @onclick="Search" disabled="@(_loading || string.IsNullOrWhiteSpace(_city))">
+            @(_loading ? "Finding…" : "Find places")
+        </button>
+    </div>
+    @if (!string.IsNullOrWhiteSpace(_vibe))
+    {
+        <div class="wp-vibe">Matching your vibe: <strong>@_vibe</strong></div>
+    }
+</div>
 
-        <div class="social-venues">
-            @foreach (var v in _venues)
-            {
-                <div class="venue-card">
-                    <div class="venue-emoji">@v.Emoji</div>
-                    <div class="venue-body">
-                        <div class="venue-name">@v.Name</div>
-                        <div class="venue-type">@v.VenueType · @v.DistanceMiles.ToString("0.0") mi · ⭐ @v.Rating.ToString("0.0")</div>
-                        <div class="venue-showing">📺 @v.ShowingMatch</div>
-                    </div>
-                    <div class="venue-watching">👀 @v.WatchingCount watching</div>
+@if (_loading)
+{
+    <LoadingSpinner Label="@($"Finding the best spots in {_city}…")" />
+}
+else if (_searched && _venues.Count == 0)
+{
+    <div class="empty-state">
+        <div class="empty-emoji">🍺</div>
+        <h2>No spots found</h2>
+        <p>Try a different city or a nearby larger town.</p>
+    </div>
+}
+else if (_venues.Count > 0)
+{
+    @if (_selected is not null)
+    {
+        <div class="venue-map-panel fade-in">
+            <div class="venue-map-head">
+                <div>
+                    <span class="venue-map-emoji">@_selected.Emoji</span>
+                    <span class="venue-map-name">@_selected.Name</span>
+                    <span class="venue-map-where">@_selected.Neighborhood@(string.IsNullOrWhiteSpace(_selected.Address) ? "" : $" · {_selected.Address}")</span>
                 </div>
-            }
-            <button class="btn btn-primary social-create">＋ Create Watch Party</button>
+                <a class="btn-ghost" href="@DirectionsUrl(_selected)" target="_blank" rel="noopener">Open in Google Maps ↗</a>
+            </div>
+            <iframe class="venue-map" src="@MapSrc(_selected)" loading="lazy"
+                    referrerpolicy="no-referrer-when-downgrade" allowfullscreen></iframe>
         </div>
+    }
+
+    <div class="wp-result-head">
+        <span>@_venues.Count places in <strong>@_city</strong></span>
+        <span class="wp-source">@(Venues.LastUsedAi ? "✨ Found by Claude" : "Sample list")</span>
     </div>
 
-    <!-- Coming Soon overlay -->
-    <div class="social-overlay">
-        <div class="social-overlay-card">
-            <div class="social-overlay-ball">⚽</div>
-            <h2 class="social-overlay-title">Watch Party Finder</h2>
-            <div class="social-overlay-badge">Coming Soon</div>
-            <p class="social-overlay-text">
-                We're building the best way to find fans, bars, and watch parties near you for every
-                World Cup 2026 match. Hang tight — this one's worth the wait.
-            </p>
-        </div>
+    <div class="venue-list">
+        @foreach (var v in _venues)
+        {
+            <button class="venue-card card-hover @(_selected == v ? "selected" : "")" @onclick="() => SelectVenue(v)">
+                <div class="venue-emoji">@v.Emoji</div>
+                <div class="venue-body">
+                    <div class="venue-name">@v.Name</div>
+                    <div class="venue-type">@v.VenueType@(string.IsNullOrWhiteSpace(v.Neighborhood) ? "" : $" · {v.Neighborhood}")</div>
+                    <div class="venue-why">@v.Why</div>
+                </div>
+                <div class="venue-cta">@(_selected == v ? "📍 Showing" : "View map →")</div>
+            </button>
+        }
     </div>
-</div>
+}
+else
+{
+    <div class="empty-state">
+        <div class="empty-emoji">🗺️</div>
+        <h2>Where are you watching?</h2>
+        <p>Enter your city above to find great spots to catch the game.@(ProfileStore.Current?.HasTeam == true ? "" : " Or build a profile so we can tailor it to you.")</p>
+        @if (ProfileStore.Current is null)
+        {
+            <a class="btn btn-primary" href="profile">🎙️ Build your profile →</a>
+        }
+    </div>
+}
 
 @code {
+    private string _city = "";
+    private string? _vibe;
+    private string? _team;
     private List<SocialVenue> _venues = new();
+    private SocialVenue? _selected;
+    private bool _loading;
+    private bool _searched;
+    private bool _autoSearched;
+    private bool _rehydrated;
 
-    protected override void OnInitialized() => _venues = SocialSvc.PreviewVenues();
+    protected override void OnInitialized() => ApplyProfile();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+
+        // Survive refreshes: pull a saved profile and use its location.
+        if (!_rehydrated && ProfileStore.Current is null)
+        {
+            _rehydrated = true;
+            try
+            {
+                var json = await JS.InvokeAsync<string?>("localStorage.getItem", ProfileState.StorageKey);
+                if (ProfileStore.LoadFromJson(json)) ApplyProfile();
+            }
+            catch { /* localStorage unavailable */ }
+        }
+
+        // Auto-search when the profile already gave us a location.
+        if (!_autoSearched && !_loading && _venues.Count == 0 && !string.IsNullOrWhiteSpace(_city))
+        {
+            _autoSearched = true;
+            await Search();
+        }
+    }
+
+    private void ApplyProfile()
+    {
+        var p = ProfileStore.Current;
+        if (p is null) return;
+        if (string.IsNullOrWhiteSpace(_city) && !string.IsNullOrWhiteSpace(p.Location))
+            _city = p.Location;
+        _vibe = string.IsNullOrWhiteSpace(p.BarVibe) ? null : p.BarVibe;
+        _team = p.HasTeam ? p.FavoriteTeam : null;
+    }
+
+    private async Task OnKey(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !string.IsNullOrWhiteSpace(_city)) await Search();
+    }
+
+    private async Task Search()
+    {
+        if (string.IsNullOrWhiteSpace(_city)) return;
+
+        _loading = true;
+        _selected = null;
+        StateHasChanged();
+
+        await SaveCityToProfile();
+        _venues = await Venues.FindVenuesAsync(_city.Trim(), _vibe, _team);
+
+        _searched = true;
+        _loading = false;
+        StateHasChanged();
+    }
+
+    private void SelectVenue(SocialVenue v) => _selected = v;
+
+    private async Task SaveCityToProfile()
+    {
+        if (ProfileStore.Current is { } p &&
+            !string.IsNullOrWhiteSpace(_city) &&
+            !string.Equals(p.Location, _city, StringComparison.OrdinalIgnoreCase))
+        {
+            p.Location = _city.Trim();
+            try { await JS.InvokeVoidAsync("localStorage.setItem", ProfileState.StorageKey, ProfileStore.ToJson()); }
+            catch { /* localStorage unavailable */ }
+        }
+    }
+
+    private static string MapSrc(SocialVenue v) =>
+        $"https://www.google.com/maps?q={Uri.EscapeDataString(v.MapQuery)}&output=embed";
+
+    private static string DirectionsUrl(SocialVenue v) =>
+        $"https://www.google.com/maps/search/?api=1&query={Uri.EscapeDataString(v.MapQuery)}";
 }

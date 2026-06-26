@@ -1,53 +1,187 @@
+using System.Text;
+using System.Text.Json;
 using WorldCupBuddy.Models;
 
 namespace WorldCupBuddy.Services;
 
 /// <summary>
-/// STUB. The Watch Party Finder is not yet implemented. This service exposes the
-/// method surface the real feature will use, plus sample venues for the blurred
-/// preview mockup on the Social page.
+/// Finds places to watch the game in a given city using Claude, tailored to the
+/// fan's preferred vibe. Falls back to generic suggestions when no API key is set.
 /// </summary>
 public class SocialService
 {
-    // TODO: Inject a geocoding/places provider (Google Places, Foursquare, etc.)
-    //       and a backing store for user-created watch parties.
+    private const string ModelId = "claude-opus-4-8";
+    private const string ApiUrl = "https://api.anthropic.com/v1/messages";
 
-    /// <summary>
-    /// TODO: Return real venues near the supplied coordinates that are showing
-    /// the given match. For now this returns the mock preview set.
-    /// </summary>
-    public Task<List<SocialVenue>> FindNearbyVenuesAsync(
-        double latitude, double longitude, double radiusMiles = 5.0,
-        CancellationToken ct = default)
+    private readonly HttpClient _http;
+    private readonly IConfiguration _config;
+    private readonly ILogger<SocialService> _logger;
+
+    public SocialService(HttpClient http, IConfiguration config, ILogger<SocialService> logger)
     {
-        // TODO: real lookup. Coordinates currently ignored.
-        return Task.FromResult(PreviewVenues());
+        _http = http;
+        _config = config;
+        _logger = logger;
     }
 
-    /// <summary>
-    /// TODO: Persist a user-hosted watch party and broadcast it to nearby fans.
-    /// </summary>
-    public Task<SocialVenue> CreateWatchPartyAsync(SocialVenue party, CancellationToken ct = default)
-    {
-        // TODO: validate, persist, and return the saved entity with a real id.
-        throw new NotImplementedException("Watch Party creation is coming soon.");
-    }
+    public bool AiConfigured => !string.IsNullOrWhiteSpace(_config["Anthropic:ApiKey"]);
+
+    /// <summary>True when the most recent search used Claude (vs the local fallback).</summary>
+    public bool LastUsedAi { get; private set; }
 
     /// <summary>
-    /// TODO: Mark the current user as attending a venue's watch party.
+    /// Suggest watch-party venues in <paramref name="city"/>, biased toward the
+    /// fan's <paramref name="vibe"/> if provided.
     /// </summary>
-    public Task JoinWatchPartyAsync(string venueId, CancellationToken ct = default)
+    public async Task<List<SocialVenue>> FindVenuesAsync(
+        string city, string? vibe = null, string? team = null, CancellationToken ct = default)
     {
-        // TODO: record attendance.
-        throw new NotImplementedException("Joining watch parties is coming soon.");
+        city = (city ?? "").Trim();
+        if (city.Length == 0) return new();
+
+        var apiKey = _config["Anthropic:ApiKey"];
+        if (!string.IsNullOrWhiteSpace(apiKey))
+        {
+            try
+            {
+                var venues = await CallClaudeAsync(city, vibe, team, apiKey!, ct);
+                if (venues is { Count: > 0 })
+                {
+                    LastUsedAi = true;
+                    foreach (var v in venues) v.City = city;
+                    return venues;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Claude venue search failed — using fallback.");
+            }
+        }
+
+        LastUsedAi = false;
+        var fb = FallbackVenues(city, vibe);
+        foreach (var v in fb) v.City = city;
+        return fb;
     }
 
-    /// <summary>Sample data for the "Coming Soon" preview mockup only.</summary>
-    public List<SocialVenue> PreviewVenues() => new()
+    // ---- Claude (forced tool call) ----------------------------------------
+
+    private async Task<List<SocialVenue>?> CallClaudeAsync(
+        string city, string? vibe, string? team, string apiKey, CancellationToken ct)
     {
-        new() { Name = "The Offside Tavern", VenueType = "Sports Bar",  DistanceMiles = 0.4, WatchingCount = 84, ShowingMatch = "USA vs Mexico",      Rating = 4.7, Emoji = "🍺" },
-        new() { Name = "Stadium Brewing Co.", VenueType = "Brewery",     DistanceMiles = 1.1, WatchingCount = 52, ShowingMatch = "Brazil vs Iran",      Rating = 4.5, Emoji = "🍻" },
-        new() { Name = "Corner Kick Cantina", VenueType = "Restaurant",  DistanceMiles = 1.8, WatchingCount = 37, ShowingMatch = "Argentina vs Canada", Rating = 4.6, Emoji = "🌮" },
-        new() { Name = "The Golden Boot",      VenueType = "Pub",         DistanceMiles = 2.3, WatchingCount = 119, ShowingMatch = "England vs Serbia",  Rating = 4.8, Emoji = "⚽" },
-    };
+        var ask = $"Recommend 6 real bars or restaurants in {city} that are great places to watch a " +
+                  "World Cup / soccer match — places with good screens and a lively game-day atmosphere.";
+        if (!string.IsNullOrWhiteSpace(vibe))
+            ask += $" The fan's preferred vibe is: \"{vibe}\" — lean toward spots matching that.";
+        if (!string.IsNullOrWhiteSpace(team))
+            ask += $" Bonus if any are known {team} supporters' bars.";
+
+        var requestBody = new
+        {
+            model = ModelId,
+            max_tokens = 1500,
+            system =
+                "You are a local guide for sports fans. Recommend real, well-known bars and restaurants " +
+                "that are good for watching live soccer. Prefer genuinely popular, real venues in the city. " +
+                "For each, give the name, venue type, neighborhood, an approximate street address or area, " +
+                "and one short sentence on why it's a great spot to watch the game. Pick an apt emoji per venue.",
+            tools = new object[]
+            {
+                new
+                {
+                    name = "save_venues",
+                    description = "Save the list of recommended watch-party venues.",
+                    input_schema = new
+                    {
+                        type = "object",
+                        properties = new
+                        {
+                            venues = new
+                            {
+                                type = "array",
+                                items = new
+                                {
+                                    type = "object",
+                                    properties = new
+                                    {
+                                        name = new { type = "string" },
+                                        venue_type = new { type = "string" },
+                                        neighborhood = new { type = "string" },
+                                        address = new { type = "string" },
+                                        why = new { type = "string" },
+                                        emoji = new { type = "string" }
+                                    },
+                                    required = new[] { "name", "venue_type", "why" }
+                                }
+                            }
+                        },
+                        required = new[] { "venues" }
+                    }
+                }
+            },
+            tool_choice = new { type = "tool", name = "save_venues" },
+            messages = new object[] { new { role = "user", content = ask } }
+        };
+
+        using var req = new HttpRequestMessage(HttpMethod.Post, ApiUrl);
+        req.Headers.Add("x-api-key", apiKey);
+        req.Headers.Add("anthropic-version", "2023-06-01");
+        req.Content = new StringContent(JsonSerializer.Serialize(requestBody), Encoding.UTF8, "application/json");
+
+        using var resp = await _http.SendAsync(req, ct);
+        var json = await resp.Content.ReadAsStringAsync(ct);
+        if (!resp.IsSuccessStatusCode)
+        {
+            _logger.LogWarning("Anthropic API {Status}: {Body}", (int)resp.StatusCode, json);
+            return null;
+        }
+
+        using var doc = JsonDocument.Parse(json);
+        foreach (var block in doc.RootElement.GetProperty("content").EnumerateArray())
+        {
+            if (block.TryGetProperty("type", out var t) && t.GetString() == "tool_use" &&
+                block.TryGetProperty("input", out var input) &&
+                input.TryGetProperty("venues", out var arr) && arr.ValueKind == JsonValueKind.Array)
+            {
+                var list = new List<SocialVenue>();
+                foreach (var v in arr.EnumerateArray())
+                {
+                    string S(string n) =>
+                        v.TryGetProperty(n, out var e) && e.ValueKind == JsonValueKind.String ? e.GetString() ?? "" : "";
+                    var name = S("name");
+                    if (string.IsNullOrWhiteSpace(name)) continue;
+                    var emoji = S("emoji");
+                    list.Add(new SocialVenue
+                    {
+                        Name = name,
+                        VenueType = S("venue_type"),
+                        Neighborhood = S("neighborhood"),
+                        Address = S("address"),
+                        Why = S("why"),
+                        Emoji = string.IsNullOrWhiteSpace(emoji) ? "📺" : emoji,
+                    });
+                }
+                return list;
+            }
+        }
+        return null;
+    }
+
+    // ---- Fallback ---------------------------------------------------------
+
+    private static List<SocialVenue> FallbackVenues(string city, string? vibe)
+    {
+        var typedVibe = string.IsNullOrWhiteSpace(vibe) ? "a lively game-day crowd" : vibe!.ToLowerInvariant();
+        return new()
+        {
+            new() { Name = "The Local Sports Bar", VenueType = "Sports Bar", Neighborhood = "Downtown",
+                    Why = $"Wall-to-wall screens and {typedVibe} — a safe bet for any match.", Emoji = "🍺" },
+            new() { Name = "Corner Pub", VenueType = "Pub", Neighborhood = "City Center",
+                    Why = "Classic pub atmosphere with the game on every TV.", Emoji = "🍻" },
+            new() { Name = "Stadium Taproom", VenueType = "Brewery", Neighborhood = "Riverside",
+                    Why = "Big projector screen and a packed, energetic crowd on match days.", Emoji = "⚽" },
+            new() { Name = "Kickoff Cantina", VenueType = "Restaurant", Neighborhood = "Midtown",
+                    Why = "Food, drinks, and sound turned up for the big games.", Emoji = "🌮" },
+        };
+    }
 }

@@ -34,6 +34,130 @@ public class SimulationService
             .ToArray();
     }
 
+    /// <summary>
+    /// Head-to-head: simulate a single match <paramref name="teamA"/> vs
+    /// <paramref name="teamB"/> <paramref name="iterations"/> times using a
+    /// Poisson goals model derived from the Elo gap (neutral venue), and
+    /// aggregate a rich set of insights. Returns null if a team isn't found.
+    /// </summary>
+    public MatchPrediction? PredictMatch(string teamA, string teamB,
+        int iterations = DefaultIterations, int? seed = null)
+    {
+        var a = Array.FindIndex(_names, x => x.Equals(teamA, StringComparison.OrdinalIgnoreCase));
+        var b = Array.FindIndex(_names, x => x.Equals(teamB, StringComparison.OrdinalIgnoreCase));
+        if (a < 0 || b < 0 || a == b) return null;
+
+        var rng = seed.HasValue ? new Random(seed.Value) : new Random();
+
+        // Expected goals from the Elo gap around a World-Cup-ish 2.6 total.
+        const double baseTotal = 2.6;
+        var supremacy = Math.Clamp((_ratings[a] - _ratings[b]) / 250.0, -2.2, 2.2);
+        var lambdaA = Math.Max(0.2, baseTotal / 2.0 + supremacy / 2.0);
+        var lambdaB = Math.Max(0.2, baseTotal / 2.0 - supremacy / 2.0);
+
+        // Penalty-shootout edge for the stronger side when a winner is required.
+        var pAelo = 1.0 / (1.0 + Math.Pow(10, (_ratings[b] - _ratings[a]) / 400.0));
+        var pAdecider = 0.5 + (pAelo - 0.5) * 0.5; // regress toward a coin flip
+
+        int winA = 0, draw = 0, winB = 0, advA = 0, advB = 0;
+        int over25 = 0, btts = 0, csA = 0, csB = 0;
+        long goalsA = 0, goalsB = 0;
+
+        const int cap = 5; // scoreline grid 0..5 each (6+ lumped into 5)
+        var grid = new int[(cap + 1) * (cap + 1)];
+
+        for (var i = 0; i < iterations; i++)
+        {
+            var gA = SamplePoisson(lambdaA, rng);
+            var gB = SamplePoisson(lambdaB, rng);
+            goalsA += gA;
+            goalsB += gB;
+
+            if (gA > gB) { winA++; advA++; }
+            else if (gB > gA) { winB++; advB++; }
+            else { draw++; if (rng.NextDouble() < pAdecider) advA++; else advB++; }
+
+            if (gA + gB >= 3) over25++;
+            if (gA >= 1 && gB >= 1) btts++;
+            if (gB == 0) csA++;
+            if (gA == 0) csB++;
+
+            grid[Math.Min(gA, cap) * (cap + 1) + Math.Min(gB, cap)]++;
+        }
+
+        double Pct(int c) => 100.0 * c / iterations;
+
+        var top = new List<ScorelineProb>();
+        for (var x = 0; x <= cap; x++)
+        for (var y = 0; y <= cap; y++)
+        {
+            var c = grid[x * (cap + 1) + y];
+            if (c == 0) continue;
+            var sx = x == cap ? "5+" : x.ToString();
+            var sy = y == cap ? "5+" : y.ToString();
+            top.Add(new ScorelineProb { Score = $"{sx}–{sy}", Pct = Pct(c) });
+        }
+        top = top.OrderByDescending(s => s.Pct).Take(6).ToList();
+
+        var pred = new MatchPrediction
+        {
+            TeamA = _names[a], FlagA = _flags[a], RatingA = _ratings[a],
+            TeamB = _names[b], FlagB = _flags[b], RatingB = _ratings[b],
+            Iterations = iterations,
+            RunAt = DateTime.Now,
+            WinPctA = Pct(winA), DrawPct = Pct(draw), WinPctB = Pct(winB),
+            AdvancePctA = Pct(advA), AdvancePctB = Pct(advB),
+            AvgGoalsA = (double)goalsA / iterations,
+            AvgGoalsB = (double)goalsB / iterations,
+            Over25Pct = Pct(over25), Under25Pct = 100.0 - Pct(over25),
+            BttsPct = Pct(btts),
+            CleanSheetPctA = Pct(csA), CleanSheetPctB = Pct(csB),
+            TopScorelines = top,
+            FairOddsA = FairAmerican(Pct(winA) / 100.0),
+            FairOddsDraw = FairAmerican(Pct(draw) / 100.0),
+            FairOddsB = FairAmerican(Pct(winB) / 100.0),
+        };
+        pred.Narrative = BuildMatchNarrative(pred);
+        return pred;
+    }
+
+    private static int SamplePoisson(double lambda, Random rng)
+    {
+        // Knuth's algorithm — fine for the small lambdas here.
+        var l = Math.Exp(-lambda);
+        var k = 0;
+        var p = 1.0;
+        do { k++; p *= rng.NextDouble(); } while (p > l);
+        return k - 1;
+    }
+
+    private static string FairAmerican(double prob)
+    {
+        if (prob <= 0.0001) return "+9999";
+        if (prob >= 0.9999) return "-9999";
+        var dec = 1.0 / prob;
+        return dec >= 2.0
+            ? $"+{Math.Round((dec - 1.0) * 100.0):0}"
+            : $"-{Math.Round(100.0 / (dec - 1.0)):0}";
+    }
+
+    private static string BuildMatchNarrative(MatchPrediction p)
+    {
+        var favName = p.WinPctA >= p.WinPctB ? p.TeamA : p.TeamB;
+        var favPct = Math.Max(p.WinPctA, p.WinPctB);
+        var margin = Math.Abs(p.WinPctA - p.WinPctB);
+
+        string framing = margin < 8 ? "a genuine coin-flip"
+            : margin < 22 ? "a close call"
+            : margin < 40 ? "a clear lean"
+            : "a heavy mismatch";
+
+        var drawLine = p.DrawPct >= 26 ? " Expect a tight, low-event game — draws are very live." : "";
+        return $"It's {framing}: {favName} win in regulation {favPct:0.0}% of the time " +
+               $"(draw {p.DrawPct:0.0}%). Projected goals {p.AvgGoalsA:0.0}–{p.AvgGoalsB:0.0}, " +
+               $"with {(p.Over25Pct >= 50 ? "Over" : "Under")} 2.5 favored.{drawLine}";
+    }
+
     public BracketSimulation Run(string? selectedTeam, int iterations = DefaultIterations, int? seed = null)
     {
         var n = _names.Length;

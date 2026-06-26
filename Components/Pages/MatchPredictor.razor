@@ -1,0 +1,225 @@
+@page "/match-predictor"
+@inject SimulationService Sim
+@inject ProfileState ProfileStore
+@inject IJSRuntime JS
+@using System.Globalization
+
+<PageTitle>Match Predictor · World Cup Buddy</PageTitle>
+
+<div class="page-head">
+    <div>
+        <h1 class="page-title">Match Predictor</h1>
+        <p class="page-sub">Head-to-head · 10,000 simulations</p>
+    </div>
+    @if (_result is not null)
+    {
+        <span class="sim-timestamp">Last run @_result.RunAt.ToString("h:mm:ss tt")</span>
+    }
+</div>
+
+<div class="mp-pick">
+    <div class="mp-team-slot">
+        <span class="mp-slot-flag">@WorldCupData.Flag(_a)</span>
+        <select class="kit-select" @bind="_a" disabled="@_running">
+            <option value="">— Team A —</option>
+            @foreach (var t in WorldCupData.Teams)
+            {
+                <option value="@t.Name">@t.Flag @t.Name</option>
+            }
+        </select>
+    </div>
+    <div class="mp-vs">VS</div>
+    <div class="mp-team-slot">
+        <span class="mp-slot-flag">@WorldCupData.Flag(_b)</span>
+        <select class="kit-select" @bind="_b" disabled="@_running">
+            <option value="">— Team B —</option>
+            @foreach (var t in WorldCupData.Teams)
+            {
+                <option value="@t.Name">@t.Flag @t.Name</option>
+            }
+        </select>
+    </div>
+</div>
+
+<div class="sim-actions">
+    <button class="btn btn-primary" @onclick="RunMatch" disabled="@(_running || !CanRun)">
+        @(_result is null ? "▶ Simulate Match" : "↻ Resimulate")
+    </button>
+    @if (!CanRun && !_running)
+    {
+        <span class="sim-hint">Pick two different teams to simulate.</span>
+    }
+</div>
+
+@if (_running)
+{
+    <div class="sim-running">
+        <div class="sim-running-text">Simulating 10,000 matches…</div>
+        <div class="sim-progress"><div class="sim-progress-fill" style="width:@($"{_progress:0}")%"></div></div>
+        <div class="sim-progress-pct">@($"{_progress:0}")%</div>
+    </div>
+}
+
+@if (_result is { } r && !_running)
+{
+    <div class="mp-matchup">
+        <div class="mp-side">
+            <span class="mp-flag">@r.FlagA</span>
+            <div class="mp-name">@r.TeamA</div>
+            <div class="mp-elo">Elo @r.RatingA</div>
+        </div>
+        <div class="mp-mid">vs</div>
+        <div class="mp-side">
+            <span class="mp-flag">@r.FlagB</span>
+            <div class="mp-name">@r.TeamB</div>
+            <div class="mp-elo">Elo @r.RatingB</div>
+        </div>
+    </div>
+
+    <div class="mp-narrative">@r.Narrative</div>
+
+    <section class="sim-section">
+        <h2 class="section-title">Regulation result <span class="section-tag">90 min</span></h2>
+        <div class="wdl-bar">
+            <div class="wdl-seg wdl-a" style="width:@Pct(r.WinPctA)"><span>@Fmt(r.WinPctA)</span></div>
+            <div class="wdl-seg wdl-d" style="width:@Pct(r.DrawPct)"><span>@Fmt(r.DrawPct)</span></div>
+            <div class="wdl-seg wdl-b" style="width:@Pct(r.WinPctB)"><span>@Fmt(r.WinPctB)</span></div>
+        </div>
+        <div class="wdl-legend">
+            <div class="wdl-leg">
+                <span class="wdl-dot wdl-a"></span> @r.TeamA win
+                <div class="wdl-odds">fair @r.FairOddsA</div>
+            </div>
+            <div class="wdl-leg">
+                <span class="wdl-dot wdl-d"></span> Draw
+                <div class="wdl-odds">fair @r.FairOddsDraw</div>
+            </div>
+            <div class="wdl-leg">
+                <span class="wdl-dot wdl-b"></span> @r.TeamB win
+                <div class="wdl-odds">fair @r.FairOddsB</div>
+            </div>
+        </div>
+    </section>
+
+    <section class="sim-section">
+        <h2 class="section-title">If a winner is required <span class="section-tag">knockout · ET/pens</span></h2>
+        <div class="wdl-bar">
+            <div class="wdl-seg wdl-a" style="width:@Pct(r.AdvancePctA)"><span>@Fmt(r.AdvancePctA)</span></div>
+            <div class="wdl-seg wdl-b" style="width:@Pct(r.AdvancePctB)"><span>@Fmt(r.AdvancePctB)</span></div>
+        </div>
+        <div class="wdl-legend">
+            <div class="wdl-leg"><span class="wdl-dot wdl-a"></span> @r.TeamA advance</div>
+            <div class="wdl-leg"><span class="wdl-dot wdl-b"></span> @r.TeamB advance</div>
+        </div>
+    </section>
+
+    <section class="sim-section">
+        <h2 class="section-title">Match insights</h2>
+        <div class="mp-tiles">
+            <div class="mp-tile"><div class="mp-tile-val">@r.AvgGoalsA.ToString("0.00")</div><div class="mp-tile-lbl">@r.TeamA avg goals</div></div>
+            <div class="mp-tile"><div class="mp-tile-val">@r.AvgGoalsB.ToString("0.00")</div><div class="mp-tile-lbl">@r.TeamB avg goals</div></div>
+            <div class="mp-tile"><div class="mp-tile-val">@r.AvgTotalGoals.ToString("0.00")</div><div class="mp-tile-lbl">Avg total goals</div></div>
+            <div class="mp-tile"><div class="mp-tile-val accent">@Fmt(r.Over25Pct)</div><div class="mp-tile-lbl">Over 2.5</div></div>
+            <div class="mp-tile"><div class="mp-tile-val">@Fmt(r.Under25Pct)</div><div class="mp-tile-lbl">Under 2.5</div></div>
+            <div class="mp-tile"><div class="mp-tile-val">@Fmt(r.BttsPct)</div><div class="mp-tile-lbl">Both teams score</div></div>
+            <div class="mp-tile"><div class="mp-tile-val">@Fmt(r.CleanSheetPctA)</div><div class="mp-tile-lbl">@r.TeamA clean sheet</div></div>
+            <div class="mp-tile"><div class="mp-tile-val">@Fmt(r.CleanSheetPctB)</div><div class="mp-tile-lbl">@r.TeamB clean sheet</div></div>
+        </div>
+    </section>
+
+    <section class="sim-section">
+        <h2 class="section-title">Most likely scorelines <span class="section-tag">@r.TeamA – @r.TeamB</span></h2>
+        <MudPaper Class="chart-panel" Elevation="0">
+            <MudChart ChartType="ChartType.Bar" ChartSeries="_scoreSeries" XAxisLabels="_scoreLabels"
+                      ChartOptions="_chartOptions" Width="100%" Height="300px" />
+        </MudPaper>
+        <div class="score-chips">
+            @foreach (var s in r.TopScorelines)
+            {
+                <div class="score-chip"><span class="score-chip-score">@s.Score</span> <span class="score-chip-pct">@Fmt(s.Pct)</span></div>
+            }
+        </div>
+    </section>
+}
+
+@code {
+    private string _a = "";
+    private string _b = "";
+    private MatchPrediction? _result;
+    private bool _running;
+    private double _progress;
+    private bool _rehydrated;
+
+    private List<ChartSeries> _scoreSeries = new();
+    private string[] _scoreLabels = Array.Empty<string>();
+    private readonly ChartOptions _chartOptions = new()
+    {
+        ChartPalette = WcbTheme.ChartPalette,
+        YAxisTicks = 2,
+    };
+
+    private bool CanRun => !string.IsNullOrEmpty(_a) && !string.IsNullOrEmpty(_b) && _a != _b;
+
+    protected override void OnInitialized()
+    {
+        if (ProfileStore.Current?.TeamIsInField == true)
+            _a = ProfileStore.Current.FavoriteTeam;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !_rehydrated && ProfileStore.Current is null && string.IsNullOrEmpty(_a))
+        {
+            _rehydrated = true;
+            try
+            {
+                var json = await JS.InvokeAsync<string?>("localStorage.getItem", ProfileState.StorageKey);
+                if (ProfileStore.LoadFromJson(json) && ProfileStore.Current!.TeamIsInField)
+                {
+                    _a = ProfileStore.Current.FavoriteTeam;
+                    StateHasChanged();
+                }
+            }
+            catch { /* localStorage unavailable */ }
+        }
+    }
+
+    private async Task RunMatch()
+    {
+        if (!CanRun) return;
+
+        _running = true;
+        _progress = 0;
+        StateHasChanged();
+
+        var work = Task.Run(() => Sim.PredictMatch(_a, _b, SimulationService.DefaultIterations));
+        while (!work.IsCompleted && _progress < 95)
+        {
+            await Task.Delay(30);
+            _progress += 5;
+            StateHasChanged();
+        }
+
+        _result = await work;
+        BuildChart();
+        _progress = 100;
+        StateHasChanged();
+        await Task.Delay(200);
+
+        _running = false;
+        StateHasChanged();
+    }
+
+    private void BuildChart()
+    {
+        if (_result is null) return;
+        _scoreLabels = _result.TopScorelines.Select(s => s.Score).ToArray();
+        _scoreSeries = new List<ChartSeries>
+        {
+            new() { Name = "Probability %", Data = _result.TopScorelines.Select(s => Math.Round(s.Pct, 1)).ToArray() }
+        };
+    }
+
+    private static string Fmt(double pct) => pct.ToString("0.0", CultureInfo.InvariantCulture) + "%";
+    private static string Pct(double pct) => pct.ToString("0.##", CultureInfo.InvariantCulture) + "%";
+}

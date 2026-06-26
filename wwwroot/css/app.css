@@ -191,22 +191,22 @@ a { color: inherit; text-decoration: none; }
     letter-spacing: 0.02em;
 }
 
-.splash-cards { display: flex; gap: 1.2rem; flex-wrap: wrap; justify-content: center; max-width: 920px; }
+.splash-cards { display: flex; gap: 1rem; flex-wrap: wrap; justify-content: center; max-width: 760px; }
 .splash-card {
     position: relative;
-    width: 260px;
+    width: 232px;
     background: rgba(15, 52, 96, 0.55);
     backdrop-filter: blur(6px);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    padding: 1.4rem;
+    padding: 1.1rem 1.2rem;
     text-align: left;
     transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 .splash-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-glow); }
-.splash-card-icon { font-size: 2rem; }
-.splash-card-title { font-size: 1.2rem; font-weight: 800; margin: 0.5rem 0 0.4rem; }
-.splash-card-text { color: var(--text-dim); font-size: 0.9rem; line-height: 1.45; }
+.splash-card-icon { font-size: 1.8rem; }
+.splash-card-title { font-size: 1.12rem; font-weight: 800; margin: 0.4rem 0 0.3rem; }
+.splash-card-text { color: var(--text-dim); font-size: 0.85rem; line-height: 1.4; }
 .splash-card-soon { opacity: 0.85; }
 .splash-card-soon-badge {
     position: absolute; top: 0.8rem; right: 0.8rem;
@@ -1039,6 +1039,71 @@ a { color: inherit; text-decoration: none; }
     font-weight: 800; font-size: 0.85rem;
     padding: 0.4rem 0.9rem; border-radius: 999px;
 }
+
+/* ============================================================
+   Match Predictor (head-to-head)
+   ============================================================ */
+.mp-pick {
+    display: flex; align-items: center; justify-content: center;
+    gap: 1rem; flex-wrap: wrap; margin-bottom: 1.2rem;
+}
+.mp-team-slot { display: flex; align-items: center; gap: 0.6rem; }
+.mp-slot-flag { font-size: 2rem; }
+.mp-vs { font-weight: 900; color: var(--accent-1); font-size: 1.1rem; }
+
+.mp-matchup {
+    display: flex; align-items: center; justify-content: center; gap: 2rem;
+    background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 1.4rem; margin-bottom: 1rem;
+}
+.mp-side { text-align: center; }
+.mp-flag { font-size: 3rem; }
+.mp-name { font-weight: 800; font-size: 1.2rem; margin-top: 0.3rem; }
+.mp-elo { color: var(--text-faint); font-size: 0.8rem; }
+.mp-mid { color: var(--text-faint); font-weight: 800; }
+
+.mp-narrative {
+    background: var(--surface); border-left: 4px solid var(--accent-2); border-radius: 10px;
+    padding: 1rem 1.2rem; color: var(--text-dim); line-height: 1.6; margin-bottom: 0.5rem;
+}
+
+/* Win / Draw / Win stacked bar */
+.wdl-bar {
+    display: flex; height: 46px; border-radius: 10px; overflow: hidden;
+    border: 1px solid var(--border); background: var(--surface);
+}
+.wdl-seg {
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 800; font-size: 0.9rem; color: #1a1a2e; min-width: 0;
+    transition: width 0.4s ease;
+}
+.wdl-seg span { padding: 0 0.3rem; white-space: nowrap; }
+.wdl-seg.wdl-a { background: var(--accent-1); color: #fff; }
+.wdl-seg.wdl-d { background: #6b7494; color: #fff; }
+.wdl-seg.wdl-b { background: #4ea8de; color: #08243a; }
+.wdl-legend { display: flex; gap: 1.5rem; flex-wrap: wrap; margin-top: 0.7rem; }
+.wdl-leg { font-size: 0.88rem; color: var(--text-dim); }
+.wdl-dot { display: inline-block; width: 11px; height: 11px; border-radius: 3px; margin-right: 0.4rem; }
+.wdl-dot.wdl-a { background: var(--accent-1); }
+.wdl-dot.wdl-d { background: #6b7494; }
+.wdl-dot.wdl-b { background: #4ea8de; }
+.wdl-odds { color: var(--text-faint); font-size: 0.78rem; margin-top: 0.15rem; }
+
+.mp-tiles {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.8rem;
+}
+.mp-tile { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 1rem; text-align: center; }
+.mp-tile-val { font-size: 1.6rem; font-weight: 800; }
+.mp-tile-val.accent { color: var(--good); }
+.mp-tile-lbl { color: var(--text-faint); font-size: 0.78rem; margin-top: 0.3rem; }
+
+.score-chips { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-top: 0.8rem; }
+.score-chip {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 999px;
+    padding: 0.35rem 0.8rem; font-size: 0.9rem;
+}
+.score-chip-score { font-weight: 800; }
+.score-chip-pct { color: var(--accent-2); font-weight: 700; }
 
 /* ============================================================
    Responsive

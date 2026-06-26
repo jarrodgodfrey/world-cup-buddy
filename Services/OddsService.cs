@@ -171,9 +171,9 @@ public class OddsService
 
         (string label, string outcome)[] selections =
         {
-            ("Home Win", m.HomeTeam),
+            ($"{m.HomeTeam} Win", m.HomeTeam),
             ("Draw", "Draw"),
-            ("Away Win", m.AwayTeam),
+            ($"{m.AwayTeam} Win", m.AwayTeam),
         };
 
         foreach (var (label, outcome) in selections)

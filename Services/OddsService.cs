@@ -36,7 +36,10 @@ public class OddsService
     public async Task<List<EVBet>> GetEdgesAsync(CancellationToken ct = default)
     {
         var matches = await FetchMatchesAsync(ct);
-        var edges = matches.Select(BuildEdge).ToList();
+        var edges = matches.Select(BuildEdge)
+            // Hide matches with an implausibly high best EV (stale/erroneous longshot lines).
+            .Where(e => e.BestEv <= OddsThresholds.MaxEv)
+            .ToList();
 
         // Sort matches by their strongest available edge.
         edges.Sort((a, b) => b.BestEv.CompareTo(a.BestEv));

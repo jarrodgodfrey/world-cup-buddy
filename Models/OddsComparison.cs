@@ -49,4 +49,10 @@ public static class OddsThresholds
 {
     public const double Value = 0.03;       // +3% edge
     public const double StrongValue = 0.07; // +7% edge
+
+    /// <summary>
+    /// Matches whose best EV exceeds this are hidden entirely — an EV this large
+    /// almost always means a stale or erroneous longshot line, not real value.
+    /// </summary>
+    public const double MaxEv = 0.10;       // +10% ceiling
 }

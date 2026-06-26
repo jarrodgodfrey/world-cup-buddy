@@ -15,6 +15,7 @@ builder.Services.AddMudServices();
 builder.Services.AddHttpClient<OddsService>();
 builder.Services.AddHttpClient<ProfileService>();
 builder.Services.AddHttpClient<SocialService>();
+builder.Services.AddHttpClient<ShopService>();
 builder.Services.AddScoped<SimulationService>();
 builder.Services.AddScoped<ProfileState>();
 

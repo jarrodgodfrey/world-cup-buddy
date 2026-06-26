@@ -1,0 +1,149 @@
+@page "/kit-locker"
+@inject ShopService Shop
+@inject ProfileState ProfileStore
+@inject IJSRuntime JS
+
+<PageTitle>Kit Locker · World Cup Buddy</PageTitle>
+
+<div class="page-head">
+    <div>
+        <h1 class="page-title">🛒 Kit Locker</h1>
+        <p class="page-sub">Gear up for your team</p>
+    </div>
+</div>
+
+<div class="kit-teambar">
+    <span class="kit-flag">@WorldCupData.Flag(_team)</span>
+    <label class="kit-team-label">
+        Shopping for
+        <select class="kit-select" @bind="_team" @bind:after="OnTeamChanged">
+            <option value="">— pick a team —</option>
+            @foreach (var t in WorldCupData.Teams)
+            {
+                <option value="@t.Name">@t.Flag @t.Name</option>
+            }
+        </select>
+    </label>
+    @if (_loaded && !_loading)
+    {
+        <span class="kit-source">@(Shop.LastUsedLiveSearch ? "✨ Live from Google Shopping" : "Shopping search links")</span>
+    }
+</div>
+
+@if (string.IsNullOrWhiteSpace(_team))
+{
+    <div class="empty-state">
+        <div class="empty-emoji">🧣</div>
+        <h2>Pick a team to shop</h2>
+        <p>Choose your team above@(ProfileStore.Current is null ? ", or build a profile and we'll set it automatically." : ".")</p>
+        @if (ProfileStore.Current is null)
+        {
+            <a class="btn btn-primary" href="profile">🎙️ Build your profile →</a>
+        }
+    </div>
+}
+else if (_loading)
+{
+    <LoadingSpinner Label="@($"Finding {_team} gear…")" />
+}
+else if (_products.Count == 0)
+{
+    <div class="empty-state">
+        <div class="empty-emoji">📦</div>
+        <h2>No gear found</h2>
+        <p>Couldn't pull listings right now — try another team.</p>
+    </div>
+}
+else
+{
+    <div class="kit-grid">
+        @foreach (var p in _products)
+        {
+            <a class="kit-card card-hover" href="@p.Link" target="_blank" rel="noopener">
+                <div class="kit-media">
+                    @if (!string.IsNullOrEmpty(p.Thumbnail))
+                    {
+                        <img class="kit-thumb" src="@p.Thumbnail" alt="@p.Title" loading="lazy" />
+                    }
+                    else
+                    {
+                        <div class="kit-emoji">@p.Emoji</div>
+                    }
+                </div>
+                <div class="kit-info">
+                    <div class="kit-title">@p.Title</div>
+                    @if (!string.IsNullOrEmpty(p.Price))
+                    {
+                        <div class="kit-price">@p.Price</div>
+                    }
+                    @if (!string.IsNullOrEmpty(p.Source))
+                    {
+                        <div class="kit-store">@(p.IsSearchLink ? "via " : "")@p.Source</div>
+                    }
+                </div>
+                <div class="kit-buy">@(p.IsSearchLink ? "Browse →" : "Buy →")</div>
+            </a>
+        }
+    </div>
+
+    <footer class="edge-footer">
+        @(Shop.LastUsedLiveSearch
+            ? "Live results via Google Shopping (SerpApi). Prices and availability set by each merchant."
+            : "Tiles open live Google Shopping search results. Add a SerpApi key to show individual products here.")
+    </footer>
+}
+
+@code {
+    private string _team = "";
+    private List<ShopProduct> _products = new();
+    private bool _loading;
+    private bool _loaded;
+    private bool _rehydrated;
+
+    protected override void OnInitialized()
+    {
+        if (ProfileStore.Current?.HasTeam == true)
+            _team = ProfileStore.Current.FavoriteTeam;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+
+        // Survive refreshes: pull a saved profile and use its team.
+        if (!_rehydrated && ProfileStore.Current is null)
+        {
+            _rehydrated = true;
+            try
+            {
+                var json = await JS.InvokeAsync<string?>("localStorage.getItem", ProfileState.StorageKey);
+                if (ProfileStore.LoadFromJson(json) && ProfileStore.Current!.HasTeam)
+                    _team = ProfileStore.Current.FavoriteTeam;
+            }
+            catch { /* localStorage unavailable */ }
+        }
+
+        if (!_loaded && !_loading && !string.IsNullOrWhiteSpace(_team))
+            await Load();
+    }
+
+    private async Task OnTeamChanged()
+    {
+        _products = new();
+        _loaded = false;
+        if (!string.IsNullOrWhiteSpace(_team)) await Load();
+        else StateHasChanged();
+    }
+
+    private async Task Load()
+    {
+        _loading = true;
+        StateHasChanged();
+
+        _products = await Shop.GetGearAsync(_team);
+
+        _loaded = true;
+        _loading = false;
+        StateHasChanged();
+    }
+}

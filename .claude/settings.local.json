@@ -45,7 +45,8 @@
       "Skill(claude-api)",
       "Bash(git --no-pager diff --stat)",
       "Bash(git add *)",
-      "Bash(git commit *)"
+      "Bash(git commit *)",
+      "Bash(curl -s \"https://serpapi.com/search.json?engine=google_shopping&q=Brazil%20national%20team%20soccer%20jersey&hl=en&gl=us&num=24&api_key=5e66dbc687cb36023b3217ab35279d760ba72aa83e0aaf113f2b9588a6a19b79\" -o /tmp/serp.json)"
     ]
   }
 }
